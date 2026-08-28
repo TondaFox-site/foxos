@@ -5,18 +5,8 @@ const app = express();
 
 app.use(cors());
 
-// TENTO ŘÁDEK OPRAVUJE "NOT FOUND":
-app.get('/', (req, res) => {
-    res.redirect('/proxy?url=https://www.google.com');
-});
-
-app.get('/proxy', async (req, res) => {
-    const targetUrl = req.query.url;
-
-    if (!targetUrl) {
-        return res.status(400).send('Chybí parametr URL');
-    }
-
+// Pomocná funkce pro stažení a úpravu stránek
+async function fetchAndSend(targetUrl, res) {
     try {
         const response = await fetch(targetUrl, {
             headers: {
@@ -24,6 +14,7 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
+        // Odstranění blokování pro iframe
         res.removeHeader('X-Frame-Options');
         res.removeHeader('Content-Security-Policy');
 
@@ -33,8 +24,22 @@ app.get('/proxy', async (req, res) => {
         const body = await response.text();
         res.send(body);
     } catch (error) {
-        res.status(500).send('Chyba proxy serveru: ' + error.message);
+        res.status(500).send('Chyba proxy: ' + error.message);
     }
+}
+
+// 1. Když někdo otevře hlavní adresu (root), pošleme přímo Google bez přesměrování
+app.get('/', async (req, res) => {
+    await fetchAndSend('https://www.google.com', res);
+});
+
+// 2. Samotná proxy pro ostatní stránky z FoxOS prohlížeče
+app.get('/proxy', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) {
+        return res.status(400).send('Chybí parametr URL');
+    }
+    await fetchAndSend(targetUrl, res);
 });
 
 const PORT = process.env.PORT || 3000;
