@@ -1,10 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
 
 const app = express();
 
-// Povolení přístupu pro tvůj webový FoxOS
 app.use(cors());
 
 app.get('/proxy', async (req, res) => {
@@ -15,13 +13,13 @@ app.get('/proxy', async (req, res) => {
     }
 
     try {
+        // Použití vestavěného fetch (Node.js 18+ ho má nativně, nepotřebuje node-fetch)
         const response = await fetch(targetUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
         });
 
-        // Vymazání blokovacích zámků
         res.removeHeader('X-Frame-Options');
         res.removeHeader('Content-Security-Policy');
 
@@ -35,5 +33,8 @@ app.get('/proxy', async (req, res) => {
     }
 });
 
+// POZOR: Port musí být načten přes process.env.PORT
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Proxy server běží na portu ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`FoxOS Proxy běží na portu ${PORT}`);
+});
