@@ -266,7 +266,19 @@ const OLD_KEYS=["foxos_tondafox_v8","foxos_tondafox_v7"];
    Příklad:
    {version:"9.4", description:"...", code:"FOX_UPDATE:NON_SYSTEM_APPS|calendar,clock,..."}
 =========================================================== */
-const ADMIN_UPDATES=[];
+const ADMIN_UPDATES=[
+
+    {
+        version:"9.3.3",
+
+        description:
+            "Oprava přesouvání aplikací, Koše a odinstalování aplikací.",
+
+        code:
+            "FOX_UPDATE:FIX_APP_MANAGEMENT"
+    }
+
+];
 
 let state=null;
 let apps=[];
@@ -1579,7 +1591,408 @@ function applyAdminPatch(code){
  if(code.startsWith("FOX_UPDATE:ADD_NOTE|")){state.notes+=(state.notes?"\n":"")+code.split("|").slice(1).join("|");return}
  if(code.startsWith("FOX_UPDATE:THEME|")){const t=code.split("|")[1];if(t!=="dark"&&t!=="light")throw new Error("Neplatné téma");state.theme=t;state.settings.theme=t;return}
  if(code.startsWith("FOX_UPDATE:SET_BROWSER_MODE|")){const mode=code.split("|")[1];if(mode!=="external"&&mode!=="internal")throw new Error("Neplatný režim FoxBrowser");state.settings.browserMode=mode;return}
+
+if(code==="FOX_UPDATE:FIX_APP_MANAGEMENT"){
+
+    repairAppManagement();
+
+    return;
+}
  throw new Error("Neznámý aktualizační patch");
+}
+
+function repairAppManagement(){
+
+    /*
+     * OPRAVA FOXOS 9.3.3
+     *
+     * 1. Opraví systémové aplikace
+     * 2. Opraví odinstalování
+     * 3. Opraví přesouvání ikon
+     * 4. Opraví Koš
+     */
+
+    const SYSTEM =
+        new Set([
+            "files",
+            "browser",
+            "store",
+            "settings",
+            "terminal",
+            "system"
+        ]);
+
+
+    /*
+     * Uložíme seznam systémových aplikací.
+     */
+
+    state.systemApps =
+        state.systemApps || {};
+
+    defaultApps.forEach(app => {
+
+        state.systemApps[app.id] =
+            SYSTEM.has(app.id);
+
+    });
+
+
+    /*
+     * OPRAVENÉ ODINSTALOVÁNÍ
+     */
+
+    window.uninstallApp =
+        function(id, fromTrash=false){
+
+            const app =
+                apps.find(
+                    a => a.id === id
+                );
+
+            if(!app){
+                foxError(
+                    "Aplikace nebyla nalezena."
+                );
+                return;
+            }
+
+
+            if(
+                app.system ||
+                SYSTEM.has(app.id)
+            ){
+
+                delete state.desktop[id];
+
+                save();
+                renderDesktop();
+
+                notify(
+                    app.name +
+                    " je systémová aplikace a nelze ji odinstalovat.",
+                    "FoxOS",
+                    "🛡️"
+                );
+
+                return;
+            }
+
+
+            if(!fromTrash){
+
+                if(
+                    !window.confirm(
+                        "Opravdu odinstalovat „" +
+                        app.name +
+                        "“?"
+                    )
+                ){
+                    return;
+                }
+
+            }
+
+
+            state.installed =
+                (state.installed || [])
+                .filter(
+                    a => a.id !== id
+                );
+
+
+            state.customApps =
+                (state.customApps || [])
+                .filter(
+                    a => a.id !== id
+                );
+
+
+            delete state.desktop[id];
+
+
+            /*
+             * U vlastních FoxApp aplikací
+             * odstraníme .fna soubor.
+             */
+
+            state.fs.files =
+                (state.fs.files || [])
+                .filter(file => {
+
+                    if(file.kind !== "app"){
+                        return true;
+                    }
+
+                    const filename =
+                        app.fileName ||
+                        (app.name + ".fna");
+
+                    return file.name !== filename;
+                });
+
+
+            save();
+
+            loadApps();
+            renderDesktop();
+            renderApps();
+
+            if(
+                windows.appstudio &&
+                typeof refreshStudioApps === "function"
+            ){
+                refreshStudioApps();
+            }
+
+
+            if(
+                windows.store
+            ){
+                const content =
+                    windows.store.querySelector(
+                        ".content"
+                    );
+
+                if(content){
+                    content.innerHTML =
+                        storeApp();
+                }
+            }
+
+
+            if(windows[id]){
+                closeWindow(id);
+            }
+
+
+            notify(
+                app.name +
+                " byla odinstalována.",
+                "FoxOS",
+                "🗑️"
+            );
+        };
+
+
+    /*
+     * OPRAVENÉ PŘESOUVÁNÍ IKON
+     */
+
+    window.enableIconDrag =
+        function(el, app){
+
+            let dragging=false;
+            let dx=0;
+            let dy=0;
+
+            el.style.touchAction =
+                "none";
+
+            el.onpointerdown =
+                function(e){
+
+                    if(!editing){
+                        return;
+                    }
+
+                    if(
+                        app.system ||
+                        SYSTEM.has(app.id)
+                    ){
+
+                        foxError(
+                            "Systémovou aplikaci nelze přesunout do Koše."
+                        );
+
+                        return;
+                    }
+
+
+                    if(e.button !== 0){
+                        return;
+                    }
+
+
+                    dragging=true;
+
+                    dx =
+                        e.clientX -
+                        el.offsetLeft;
+
+                    dy =
+                        e.clientY -
+                        el.offsetTop;
+
+
+                    try{
+                        el.setPointerCapture(
+                            e.pointerId
+                        );
+                    }catch{}
+
+
+                    const move =
+                        function(ev){
+
+                            if(!dragging){
+                                return;
+                            }
+
+                            const x =
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        innerWidth-105,
+                                        ev.clientX-dx
+                                    )
+                                );
+
+                            const y =
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        innerHeight-155,
+                                        ev.clientY-dy
+                                    )
+                                );
+
+
+                            el.style.left =
+                                x+"px";
+
+                            el.style.top =
+                                y+"px";
+
+
+                            state.desktop[
+                                app.id
+                            ]={
+                                x:x,
+                                y:y
+                            };
+
+
+                            const trash =
+                                document.getElementById(
+                                    "trash"
+                                );
+
+                            const r =
+                                trash.getBoundingClientRect();
+
+
+                            trash.classList.toggle(
+                                "dragOver",
+                                ev.clientX>=r.left &&
+                                ev.clientX<=r.right &&
+                                ev.clientY>=r.top &&
+                                ev.clientY<=r.bottom
+                            );
+                        };
+
+
+                    const up =
+                        function(ev){
+
+                            if(!dragging){
+                                return;
+                            }
+
+                            dragging=false;
+
+
+                            document.removeEventListener(
+                                "pointermove",
+                                move
+                            );
+
+                            document.removeEventListener(
+                                "pointerup",
+                                up
+                            );
+
+
+                            const trash =
+                                document.getElementById(
+                                    "trash"
+                                );
+
+                            const r =
+                                trash.getBoundingClientRect();
+
+
+                            const over =
+                                ev.clientX>=r.left &&
+                                ev.clientX<=r.right &&
+                                ev.clientY>=r.top &&
+                                ev.clientY<=r.bottom;
+
+
+                            trash.classList.remove(
+                                "dragOver"
+                            );
+
+
+                            if(over){
+
+                                uninstallApp(
+                                    app.id,
+                                    true
+                                );
+
+                                return;
+                            }
+
+
+                            save();
+                            renderDesktop();
+                        };
+
+
+                    document.addEventListener(
+                        "pointermove",
+                        move
+                    );
+
+                    document.addEventListener(
+                        "pointerup",
+                        up
+                    );
+                };
+        };
+
+
+    /*
+     * Zabráníme tomu, aby systémová aplikace
+     * dostala starou pozici Koše.
+     */
+
+    SYSTEM.forEach(id => {
+
+        if(
+            defaultApps.some(
+                a => a.id === id
+            )
+        ){
+            delete state.desktop[id];
+        }
+
+    });
+
+
+    save();
+
+    loadApps();
+    renderDesktop();
+    renderApps();
+
+
+    notify(
+        "Správa aplikací a Koš byly opraveny.",
+        "FoxOS 9.3.3",
+        "🛠️"
+    );
 }
 function versionNumber(v){const p=String(v||"0.0").split(".").map(x=>Number(x)||0);return(p[0]||0)*100+(p[1]||0)}
 function openCodeEditor(){
