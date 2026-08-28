@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FoxOS 9.3 — TondaFox</title>
+<link rel="icon" href="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png">
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#0d1117;--panel:rgba(24,29,39,.94);--panel2:#1b2230;
+  --text:#fff;--muted:#aeb6c5;--accent:#ff7a00;--border:rgba(255,255,255,.12);
+}
+.light{
+  --bg:#eef2f8;--panel:rgba(255,255,255,.95);--panel2:#fff;
+  --text:#161a22;--muted:#5b6473;--border:rgba(0,0,0,.12);
+}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,textarea,select{font:inherit}
+button{border:0;border-radius:9px;padding:9px 12px;cursor:pointer;background:var(--panel2);color:var(--text)}
+button:hover{filter:brightness(1.08)}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,textarea,select{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px;outline:none}
+textarea{resize:none}
+.orange{background:var(--accent);color:#fff}
+.danger{background:#c62828;color:#fff}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+hr{border:0;border-top:1px solid var(--border);margin:14px 0}
+
+/* BOOT / LOCK / SETUP */
+.overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:100000;background:#070a0f;color:#fff;text-align:center}
+#boot{display:flex}
+.overlay img{width:130px;height:130px;object-fit:contain}
+.overlay h1{font-size:42px;margin:12px 0 4px}
+.loader{width:260px;height:6px;background:#272d38;border-radius:10px;overflow:hidden;margin-top:18px}
+.loader i{display:block;width:0;height:100%;background:#ff7a00}
+#boot .loader i{animation:load 1.9s linear forwards}
+#welcome .loader i{animation:load 1.5s linear forwards}
+@keyframes load{to{width:100%}}
+.pop{animation:pop .65s ease}
+@keyframes pop{from{opacity:0;transform:scale(.65) translateY(18px)}to{opacity:1;transform:none}}
+.setupBox{width:min(450px,92%);padding:34px;background:var(--panel);border:1px solid var(--border);border-radius:24px;box-shadow:0 30px 80px #0008;text-align:center}
+.setupBox img{width:105px;height:105px;object-fit:contain}
+.setupBox input{width:100%;margin:7px 0}
+
+/* DESKTOP */
+#desktop{position:fixed;inset:0;background:
+  radial-gradient(circle at 20% 20%,#ff7a0016,transparent 30%),
+  radial-gradient(circle at 80% 80%,#735cff13,transparent 35%),var(--bg)}
+#wallFox{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#wallFox img{width:min(58vw,640px);height:min(58vw,640px);object-fit:contain;opacity:.075}
+#wallFox.hidden img{opacity:0}
+
+/* ICONS */
+#icons{position:absolute;inset:12px 12px 64px 12px}
+.icon{position:absolute;width:92px;min-height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:5px;border-radius:10px;user-select:none;cursor:pointer}
+.icon:hover{background:#ffffff15}
+.icon .ico{width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:34px}
+.icon .ico img{max-width:42px;max-height:42px;object-fit:contain}
+.icon span:last-child{font-size:12px;text-align:center;text-shadow:0 2px 3px #000}
+.editing .icon{outline:2px dashed var(--accent);cursor:move}
+.light .icon span:last-child{text-shadow:none}
+
+/* TASKBAR */
+.taskbar{position:absolute;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--panel);backdrop-filter:blur(20px);border-top:1px solid var(--border);z-index:7000}
+.startBtn{width:44px;height:42px;background:var(--accent);color:#fff;font-size:22px}
+.task{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task.active{outline:2px solid var(--accent)}
+.taskClock{margin-left:auto;text-align:right;line-height:15px;font-size:12px}
+
+/* START */
+#startMenu{display:none;position:absolute;left:10px;bottom:64px;width:440px;max-height:630px;overflow:auto;padding:16px;background:var(--panel);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:18px;z-index:8000;box-shadow:0 22px 70px #0008}
+.startGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.appItem{min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.appItem .appIco{width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:28px}
+.appItem img{max-width:36px;max-height:36px;object-fit:contain}
+
+/* WINDOWS */
+#windows{position:absolute;inset:0;pointer-events:none}
+.win{position:absolute;min-width:300px;min-height:220px;width:700px;height:480px;background:var(--panel);border:1px solid var(--border);border-radius:13px;box-shadow:0 26px 80px #0008;overflow:hidden;pointer-events:auto;display:flex;flex-direction:column}
+.titlebar{height:43px;display:flex;align-items:center;padding:0 8px 0 14px;background:var(--panel2);border-bottom:1px solid var(--border);cursor:move;flex-shrink:0}
+.titlebar strong{flex:1}
+.winBtns{display:flex;gap:3px}
+.winBtns button{width:34px;height:31px;padding:0}
+.close:hover{background:#e53935;color:#fff}
+.content{flex:1;overflow:auto;padding:15px}
+.resizeHandle{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize}
+
+/* NOTIFY */
+#notify{position:fixed;right:18px;bottom:70px;width:350px;display:flex;flex-direction:column;gap:10px;z-index:120000;pointer-events:none}
+.note{display:flex;gap:12px;padding:14px 16px;background:var(--panel);backdrop-filter:blur(18px);border:1px solid var(--border);border-radius:13px;box-shadow:0 12px 35px #0007;animation:slideIn .3s}
+.note.out{animation:slideOut .3s forwards}
+@keyframes slideIn{from{opacity:0;transform:translateX(70px)}to{opacity:1;transform:none}}
+@keyframes slideOut{to{opacity:0;transform:translateX(70px)}}
+
+/* TRASH */
+#trash{display:none;position:absolute;right:20px;bottom:72px;width:110px;height:110px;border:2px dashed #ff6b6b;border-radius:16px;background:#ff000015;align-items:center;justify-content:center;flex-direction:column;z-index:6000}
+.editing #trash{display:flex}
+#trash.dragOver{background:#ff000039;transform:scale(1.05)}
+
+/* FILES */
+.sideLayout{display:grid;grid-template-columns:175px 1fr;gap:12px;min-height:480px}
+.side{border-right:1px solid var(--border);padding-right:8px}
+.side button{width:100%;margin-bottom:6px;text-align:left}
+.side button.active{background:var(--accent);color:#fff}
+.folderRow,.fileRow{display:flex;align-items:center;gap:10px;padding:9px;border-radius:8px}
+.folderRow:hover,.fileRow:hover{background:#ffffff12}
+.thumb{width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px}
+.fileMeta{flex:1;min-width:0}
+.fileMeta b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* PAINT */
+#paintCanvas{width:100%;height:400px;background:#fff;border-radius:8px;touch-action:none;cursor:crosshair}
+.paintTools{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+
+/* BROWSER / EDITOR */
+.browserWrap{height:100%;display:flex;flex-direction:column;min-height:0}
+.browserTools{display:flex;gap:6px;flex-wrap:wrap}
+.browserTools input{flex:1;min-width:180px}
+.browserViewport{flex:1;min-height:0;margin-top:10px;position:relative}
+.browserViewport iframe{width:100%;height:100%;border:0;background:#fff;border-radius:10px}
+.editor{width:100%;height:300px;font:13px Consolas,monospace}
+.preview{width:100%;height:260px;border:1px solid var(--border);border-radius:8px;background:#fff}
+
+/* STORE */
+.storeCard{cursor:pointer;transition:.15s}
+.storeCard:hover{transform:translateY(-1px)}
+.storeIcon{width:58px;height:58px;display:flex;align-items:center;justify-content:center;font-size:28px}
+.storeIcon img{max-width:52px;max-height:52px}
+.badge{display:inline-block;padding:3px 7px;border-radius:8px;background:#ff7a0028;color:#ff9f55;font-size:11px}
+.stars{color:#ffb300;letter-spacing:2px}
+
+/* INSTALL */
+#installOverlay{display:none;position:fixed;inset:0;z-index:125000;align-items:center;justify-content:center;background:#0008;backdrop-filter:blur(5px)}
+.installBox{width:min(430px,90%);padding:30px;text-align:center;background:var(--panel);border:1px solid var(--border);border-radius:22px;box-shadow:0 24px 70px #0009}
+.installIcon{height:80px;display:flex;align-items:center;justify-content:center}
+
+/* CRASH */
+#crash{display:none;position:fixed;inset:0;z-index:130000;background:#050505;color:#fff;align-items:center;justify-content:center;text-align:center}
+.crashBox{max-width:620px;padding:30px}
+
+/* SETTINGS */
+.settingsGrid{display:grid;grid-template-columns:190px 1fr;gap:10px}
+
+/* RESPONSIVE */
+@media(max-width:700px){
+  #startMenu{width:calc(100vw - 20px)}
+  .startGrid{grid-template-columns:repeat(2,1fr)}
+  .settingsGrid,.sideLayout{grid-template-columns:1fr}
+  .side{border-right:0;border-bottom:1px solid var(--border);padding:0 0 8px}
+  .win{width:calc(100vw - 10px)!important;height:calc(100vh - 65px)!important;left:5px!important;top:5px!important}
+}
+</style>
+</head>
+<body>
+
+<div id="boot" class="overlay">
+  <img src="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png" class="pop">
+  <h1>FoxOS 9.3</h1>
+  <p>Spouštění systému...</p>
+  <div class="loader"><i></i></div>
+</div>
+
+<div id="welcome" class="overlay">
+  <img src="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png" class="pop">
+  <h1 id="welcomeTitle" class="pop">Vítej!</h1>
+  <p>Připravuji tvoje prostředí...</p>
+  <div class="loader"><i></i></div>
+</div>
+
+<div id="lock" class="overlay">
+  <img src="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png">
+  <div id="lockTime" style="font-size:64px;font-weight:600"></div>
+  <div id="lockDate" style="font-size:18px;color:#bbb"></div>
+  <p>Stiskni libovolnou klávesu pro přihlášení</p>
+</div>
+
+<div id="login" class="overlay">
+  <div class="setupBox">
+    <img src="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png">
+    <h1>🦊 FoxOS 9.3</h1>
+    <p id="loginUser"></p>
+    <input id="loginPass" type="password" placeholder="Heslo">
+    <button class="orange" onclick="login()">Přihlásit se</button>
+  </div>
+</div>
+
+<div id="setup" class="overlay">
+  <div class="setupBox">
+    <img src="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png">
+    <h1>🦊 FoxOS Setup</h1>
+    <p>Vytvoř si svůj účet FoxOS.</p>
+    <input id="newUser" value="TondaFox" placeholder="Uživatelské jméno">
+    <input id="newPass" type="password" placeholder="Heslo">
+    <input id="newPass2" type="password" placeholder="Heslo znovu">
+    <button class="orange" onclick="finishSetup()">Vytvořit FoxOS</button>
+  </div>
+</div>
+
+<div id="desktop">
+  <div id="wallFox"><img id="wallImg" src="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png"></div>
+  <div id="icons"></div>
+  <div id="windows"></div>
+  <div id="trash"
+       ondragover="trashOver(event)"
+       ondragleave="trashLeave(event)"
+       ondrop="trashDrop(event)">
+    <div style="font-size:42px">🗑️</div>
+    <div>Koš</div>
+  </div>
+
+  <div id="startMenu">
+    <input id="appSearch" style="width:100%;margin-bottom:12px" placeholder="🔎 Hledat aplikaci..." oninput="renderApps()">
+    <div id="appGrid" class="startGrid"></div>
+  </div>
+
+  <div class="taskbar">
+    <button class="startBtn" onclick="toggleStart()">🦊</button>
+    <button onclick="toggleDesktopEdit()">🖥️ P</button>
+    <div id="tasks"></div>
+    <div id="taskClock" class="taskClock"></div>
+  </div>
+</div>
+
+<div id="notify"></div>
+
+<div id="installOverlay">
+  <div class="installBox">
+    <div id="installIcon" class="installIcon"></div>
+    <h2 id="installName">Instalace</h2>
+    <p id="installStatus" class="muted">Připravuji...</p>
+    <div class="loader"><i id="installBar" style="width:0;animation:none"></i></div>
+    <p id="installPercent">0 %</p>
+  </div>
+</div>
+
+<div id="crash">
+  <div class="crashBox">
+    <div style="font-size:70px">⚠️</div>
+    <h1 style="font-size:46px;color:#ff3030">CRASH</h1>
+    <h2>FoxOS narazil na chybu</h2>
+    <p id="crashText"></p>
+    <p style="color:#999">Toto je pouze simulovaný crash této webové aplikace. Tvůj počítač je v bezpečí.</p>
+    <button class="danger" onclick="leaveSite()">Opustit web</button>
+    <button class="orange" onclick="recoverFoxOS()">Obnovit FoxOS</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================== CORE ===================== */
+const FOXIMG="https://raw.githubusercontent.com/TondaFox-site/images/refs/heads/main/unnamed-removebg-preview.png";
+const KEY="foxos_tondafox_v9";
+const CURRENT_VERSION="9.3";
+const LOCK_BG_DEFAULT="https://img.wallscloud.net/uploads/thumb/4064513564/abstract-blue-flower-windows-11-1-68427-440x275-MM-80.webp";
+const MAX_BACK=3;
+const OLD_KEYS=["foxos_tondafox_v8","foxos_tondafox_v7"];
+
+/* ===================== ADMIN UPDATES =====================
+   SPRÁVCE WEBU přidává budoucí aktualizace POUZE sem.
+   Uživatelé nemají možnost aktualizaci vytvářet ani měnit.
+   Příklad:
+   {version:"9.4", description:"...", code:"FOX_UPDATE:NON_SYSTEM_APPS|calendar,clock,..."}
+=========================================================== */
+const ADMIN_UPDATES=[];
+
+let state=null;
+let apps=[];
+let windows={};
+let zIndex=20;
+let editing=false;
+let fileCategory="all";
+let currentFolderId="root";
+let paintCtx=null;
+let painting=false;
+let paintMode="brush";
+let stopwatchStart=0;
+let stopwatchElapsed=0;
+let stopwatchTimer=null;
+let alarmTimer=null;
+let timerInterval=null;
+let clockTimer=null;
+let pendingInstallTimer=null;
+let pendingFullCode=null;
+
+const SYSTEM_IDS=new Set(["files","browser","store","settings","terminal","system"]);
+
+const defaultApps=[
+ {id:"files",name:"Soubory",ico:"📁",type:"native",system:true},
+ {id:"browser",name:"FoxBrowser",ico:"🌐",type:"native",system:true},
+ {id:"calendar",name:"Fox Calendar",ico:"📅",type:"native",system:false},
+ {id:"clock",name:"Fox Clock",ico:"⏱️",type:"native",system:false},
+ {id:"paint",name:"Malování",ico:"🎨",type:"native",system:false},
+ {id:"vscode",name:"Fox VS Code",ico:"💻",type:"native",system:false},
+ {id:"appstudio",name:"FoxApp Studio",ico:"🧩",type:"native",system:false},
+ {id:"store",name:"FoxStore",ico:"🛒",type:"native",system:true},
+ {id:"settings",name:"Nastavení",ico:"⚙️",type:"native",system:true},
+ {id:"terminal",name:"FoxTerminal",ico:"⌨️",type:"native",system:true},
+ {id:"calculator",name:"Kalkulačka",ico:"🧮",type:"native",system:false},
+ {id:"notes",name:"Poznámky",ico:"📝",type:"native",system:false},
+ {id:"system",name:"Tento počítač",ico:"🖥️",type:"native",system:true},
+ {id:"help",name:"Fox://help",ico:"❓",type:"native",system:false}
+];
+
+const storeSeed=[
+ ["google","Google","https://www.google.com","Vyhledávání","https://www.google.com/favicon.ico","1.0"],
+ ["youtube","YouTube","https://www.youtube.com","Video","https://www.youtube.com/s/desktop/12c5b3f1/img/favicon_32x32.png","1.0"],
+ ["github","GitHub","https://github.com","Vývoj","https://github.com/favicon.ico","1.0"],
+ ["wikipedia","Wikipedia","https://cs.wikipedia.org","Encyklopedie","https://cs.wikipedia.org/static/favicon/wikipedia.ico","1.0"],
+ ["maps","Google Maps","https://www.google.com/maps","Mapy","https://www.google.com/favicon.ico","1.0"],
+ ["gmail","Gmail","https://mail.google.com","E-mail","https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico","1.0"],
+ ["drive","Google Drive","https://drive.google.com","Disk","https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png","1.0"],
+ ["translate","Google Překladač","https://translate.google.com","Překladač","https://www.google.com/favicon.ico","1.0"],
+ ["discord","Discord","https://discord.com/app","Komunikace","https://discord.com/assets/847541504914fd33810c.svg","1.0"],
+ ["whatsapp","WhatsApp","https://web.whatsapp.com","Komunikace","https://web.whatsapp.com/favicon.ico","1.0"],
+ ["mi","Xiaomi","https://www.mi.com/cz/","Technologie","https://www.mi.com/favicon.ico","1.0"],
+ ["minecraft","Minecraft","https://www.minecraft.net/","Hra","https://www.minecraft.net/etc.clientlibs/minecraft/clientlibs/main/resources/favicon.ico","1.0"],
+ ["reddit","Reddit","https://www.reddit.com/","Komunita","https://www.reddit.com/favicon.ico","1.0"],
+ ["roblox","Roblox","https://www.roblox.com/","Hry","https://www.roblox.com/favicon.ico","1.0"],
+ ["spotify","Spotify","https://open.spotify.com/","Hudba","https://open.spotify.com/favicon.ico","1.0"],
+ ["twitch","Twitch","https://www.twitch.tv/","Streamy","https://www.twitch.tv/favicon.ico","1.0"],
+ ["x","X","https://x.com/","Sociální síť","https://x.com/favicon.ico","1.0"],
+ ["outlook","Outlook","https://outlook.live.com/","E-mail","https://outlook.live.com/favicon.ico","1.0"],
+ ["ivysilani","iVysílání","https://www.ceskatelevize.cz/ivysilani/","Česká televize","https://www.ceskatelevize.cz/favicon.ico","1.0"],
+ ["weather","Počasí","https://www.google.com/search?q=weather","Počasí","https://www.google.com/favicon.ico","1.0"]
+];
+
+/* ===================== SAFE HELPERS ===================== */
+function esc(value){
+ return String(value??"")
+  .replace(/&/g,"&amp;")
+  .replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;")
+  .replace(/'/g,"&#039;");
+}
+function escAttr(value){return esc(value)}
+function save(){
+ try{localStorage.setItem(KEY,JSON.stringify(state))}
+ catch(e){console.warn("FoxOS save failed",e)}
+}
+function notify(text,title="FoxOS",icon="🦊"){
+ const host=document.getElementById("notify");
+ if(!host)return;
+ if(state && state.settings && state.settings.notifications===false)return;
+ const n=document.createElement("div");
+ n.className="note";
+ n.innerHTML=`<div style="font-size:26px">${icon}</div><div><b>${esc(title)}</b><div class="muted small">${esc(text)}</div></div>`;
+ host.appendChild(n);
+ setTimeout(()=>n.classList.add("out"),3500);
+ setTimeout(()=>n.remove(),3850);
+}
+function foxError(text){notify(text,"FoxOS","⚠️")}
+function safeParse(raw){
+ try{return raw?JSON.parse(raw):null}catch(e){return null}
+}
+function normalizeUrl(url){
+ let u=String(url||"").trim();
+ if(!u)return "https://www.google.com";
+ if(!/^https?:\/\//i.test(u))u="https://"+u;
+ return u;
+}
+function getApp(id){return apps.find(a=>a.id===id)||null}
+function getSystemState(){
+ if(!state || typeof state!=="object") return null;
+ if(!state.settings || typeof state.settings!=="object") state.settings={};
+ const s=state.settings;
+ s.notifications=s.notifications!==false;
+ s.browserMode=s.browserMode||"external";
+ s.homepage=s.homepage||"https://www.google.com";
+ s.wallpaper=s.wallpaper||"";
+ s.wallpaperFox=s.wallpaperFox!==false;
+ s.lockWallpaper=s.lockWallpaper||LOCK_BG_DEFAULT;
+ s.cacheLimitMb=Number.isFinite(Number(s.cacheLimitMb))?Number(s.cacheLimitMb):500;
+ s.cacheUsedMb=Number.isFinite(Number(s.cacheUsedMb))?Number(s.cacheUsedMb):0;
+ s.theme=s.theme||state.theme||"dark";
+ state.settings=s;
+ if(!state.fs || typeof state.fs!=="object") state.fs={files:[],folders:[{id:"root",name:"Domů",parent:null}]};
+ if(!Array.isArray(state.fs.files)) state.fs.files=[];
+ if(!Array.isArray(state.fs.folders) || !state.fs.folders.length) state.fs.folders=[{id:"root",name:"Domů",parent:null}];
+ if(!Array.isArray(state.installed)) state.installed=[];
+ if(!Array.isArray(state.customApps)) state.customApps=[];
+ if(!state.desktop || typeof state.desktop!=="object") state.desktop={};
+ if(!state.events || typeof state.events!=="object") state.events={};
+ if(typeof state.notes!=="string") state.notes="";
+ if(!state.update || typeof state.update!=="object") state.update={installedVersion:state.version||CURRENT_VERSION,pending:null};
+ return state;
+}
+
+/* ===================== MIGRATION ===================== */
+function migrateOldData(){
+ let old=null;
+ for(const k of OLD_KEYS){
+  const candidate=safeParse(localStorage.getItem(k));
+  if(candidate){old=candidate;break}
+ }
+ if(!old)return;
+ if(!state)state={};
+ if(!state.user && old.user)state.user=old.user;
+ if(!state.pass && old.pass)state.pass=old.pass;
+ if(!state.theme)state.theme=old.theme||"dark";
+ if(!state.installed)state.installed=old.installed||[];
+ if(!state.customApps)state.customApps=old.customApps||[];
+ if(!state.desktop)state.desktop=old.desktop||{};
+ if(!state.events)state.events=old.events||{};
+ if(!state.notes)state.notes=old.notes||"";
+ if(!state.settings)state.settings=old.settings||{};
+ if(old.files && (!state.fs || !state.fs.files))state.fs={files:old.files||[],folders:[{id:"root",name:"Domů",parent:null}]};
+ save();
+}
+
+/* ===================== SETUP / LOGIN ===================== */
+function finishSetup(){
+ const user=document.getElementById("newUser").value.trim()||"TondaFox";
+ const pass=document.getElementById("newPass").value;
+ const pass2=document.getElementById("newPass2").value;
+ if(!pass){foxError("Zadej heslo.");return}
+ if(pass!==pass2){foxError("Hesla se neshodují.");return}
+
+ state={
+  version:CURRENT_VERSION,
+  user,
+  pass,
+  theme:"dark",
+  installed:[],
+  customApps:[],
+  desktop:{},
+  events:{},
+  notes:"",
+  settings:{
+   notifications:true,
+   browserMode:"external",
+   homepage:"https://www.google.com",
+   wallpaper:"",
+   wallpaperFox:true,
+   cacheLimitMb:500,
+   cacheUsedMb:0,
+   animations:true
+  },
+  fs:{
+   files:[],
+   folders:[{id:"root",name:"Domů",parent:null}]
+  }
+ };
+
+ save();
+ document.getElementById("setup").style.display="none";
+ showWelcome("FoxOS byl připraven!");
+}
+
+function login(){
+ const pass=document.getElementById("loginPass").value;
+ if(!state || pass!==state.pass){foxError("Nesprávné heslo.");return}
+ document.getElementById("login").style.display="none";
+ document.getElementById("loginPass").value="";
+ document.getElementById("welcomeTitle").textContent="Vítej, "+state.user+"!";
+ document.getElementById("welcome").style.display="flex";
+ setTimeout(()=>{document.getElementById("welcome").style.display="none";startSystem()},1700);
+}
+function showWelcome(text){
+ document.getElementById("welcomeTitle").textContent=text;
+ document.getElementById("welcome").style.display="flex";
+ setTimeout(()=>{
+  document.getElementById("welcome").style.display="none";
+  showLock();
+ },1700);
+}
+function showLock(){
+ const lock=document.getElementById("lock");
+ lock.style.display="flex";
+ updateLock();
+}
+function updateLock(){
+ const now=new Date();
+ document.getElementById("lockTime").textContent=now.toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"});
+ document.getElementById("lockDate").textContent=now.toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+ const bg=state?.settings?.lockWallpaper||LOCK_BG_DEFAULT;
+ document.getElementById("lock").style.background=`linear-gradient(#0007,#0007),url("${bg}") center/cover no-repeat`;
+}
+function startSystem(){
+ getSystemState();
+ if(!state)return;
+ document.getElementById("desktop").style.display="block";
+ document.body.classList.toggle("light",state.theme==="light");
+ loadApps();
+ applySettings();
+ renderDesktop();
+ renderApps();
+ updateClock();
+ if(!clockTimer){
+  clockTimer=setInterval(()=>{
+   updateClock();
+   if(document.getElementById("lock").style.display==="flex")updateLock();
+  },1000);
+ }
+}
+function initialize(){
+ try{
+  state=safeParse(localStorage.getItem(KEY));
+  if(!state)migrateOldData();
+  if(!state){
+   document.getElementById("boot").style.display="none";
+   document.getElementById("setup").style.display="flex";
+   return;
+  }
+  getSystemState();
+  if(isTooOldVersion(state.version||CURRENT_VERSION)){
+   triggerUnsupportedCrash(state.version||"neznámá");
+   return;
+  }
+  document.getElementById("boot").style.display="none";
+  document.getElementById("loginUser").textContent="Uživatel: "+state.user;
+  showLock();
+ }catch(e){
+  console.error("FoxOS init",e);
+  document.getElementById("boot").style.display="none";
+  triggerCrash("FoxOS se nepodařilo spustit: "+e.message);
+ }
+}
+function isTooOldVersion(v){return versionNumber(CURRENT_VERSION)-versionNumber(v)>MAX_BACK}
+function triggerUnsupportedCrash(v){document.getElementById("crashText").textContent="Nainstalovaná verze: "+v+". Tato verze již není podporována; aktualizuj FoxOS.";document.getElementById("crash").style.display="flex"}
+
+/* ===================== DESKTOP ===================== */
+function loadApps(){
+ apps=defaultApps.map(a=>{
+  const copy={...a};
+  if(SYSTEM_IDS.has(copy.id))copy.system=true;
+  else if(state.systemApps && Object.prototype.hasOwnProperty.call(state.systemApps,copy.id))copy.system=!!state.systemApps[copy.id];
+  return copy;
+ });
+ (state.installed||[]).forEach(a=>{if(!apps.some(x=>x.id===a.id))apps.push({...a})});
+ (state.customApps||[]).forEach(a=>{if(!apps.some(x=>x.id===a.id))apps.push({...a})});
+}
+function appIconHtml(a,size=40){
+ if(a.iconData){
+  return `<img src="${escAttr(a.iconData)}" style="width:${size}px;height:${size}px;object-fit:contain" onerror="this.replaceWith(document.createTextNode('🧩'))">`;
+ }
+ if(a.ico && /^https?:\/\//i.test(a.ico)){
+  return `<img src="${escAttr(a.ico)}" style="width:${size}px;height:${size}px;object-fit:contain" onerror="this.replaceWith(document.createTextNode('🌐'))">`;
+ }
+ return esc(a.ico||"🦊");
+}
+function positionFor(i){
+ return{x:15+(i%8)*105,y:15+Math.floor(i/8)*100};
+}
+function renderDesktop(){
+ const box=document.getElementById("icons");
+ box.innerHTML="";
+ apps.forEach((a,i)=>{
+  const p=state.desktop[a.id]||positionFor(i);
+  const d=document.createElement("div");
+  d.className="icon";
+  d.dataset.id=a.id;
+  d.style.left=p.x+"px";
+  d.style.top=p.y+"px";
+  d.innerHTML=`<div class="ico">${appIconHtml(a,40)}</div><span>${esc(a.name)}</span>`;
+  d.ondblclick=()=>openApp(a.id);
+  if(editing && !a.system) enableIconDrag(d,a);
+  box.appendChild(d);
+ });
+}
+
+function uninstallApp(id, fromTrash=false){
+
+    const app = apps.find(a => a.id === id);
+
+    if(!app){
+        notify(
+            "Aplikace nebyla nalezena.",
+            "FoxOS",
+            "⚠️"
+        );
+        return;
+    }
+
+    /* Systémové aplikace nikdy nemažeme */
+    if(app.system || SYSTEM_IDS.has(app.id)){
+
+        delete state.desktop[id];
+
+        save();
+        renderDesktop();
+
+        notify(
+            app.name +
+            " je systémová aplikace a nelze ji odinstalovat.",
+            "FoxOS",
+            "🛡️"
+        );
+
+        return;
+    }
+
+    /* Odinstalování z FoxStore / FoxApp Studio */
+    if(!fromTrash){
+
+        const confirmed =
+            window.confirm(
+                "Opravdu chceš odinstalovat aplikaci „"+
+                app.name+
+                "“?"
+            );
+
+        if(!confirmed){
+            return;
+        }
+
+    }
+
+    /*
+     * Odstranit z nainstalovaných aplikací
+     */
+    state.installed =
+        (state.installed || [])
+        .filter(a => a.id !== id);
+
+    /*
+     * Odstranit z vlastních aplikací
+     */
+    state.customApps =
+        (state.customApps || [])
+        .filter(a => a.id !== id);
+
+    /*
+     * Odstranit ikonu z plochy
+     */
+    delete state.desktop[id];
+
+    /*
+     * U aplikací vytvořených ve FoxApp Studio
+     * odstraníme také .fna soubor.
+     */
+    state.fs.files =
+        (state.fs.files || [])
+        .filter(file => {
+
+            if(file.kind !== "app"){
+                return true;
+            }
+
+            const fileName =
+                app.fileName ||
+                (app.name + ".fna");
+
+            return file.name !== fileName;
+        });
+
+    save();
+
+    /*
+     * Znovu načíst aplikace
+     */
+    loadApps();
+
+    /*
+     * Znovu vykreslit plochu
+     */
+    renderDesktop();
+    renderApps();
+
+    /*
+     * Aktualizovat otevřená okna
+     */
+    if(windows.appstudio){
+        refreshStudioApps();
+    }
+
+    if(windows.store){
+        const content =
+            windows.store.querySelector(".content");
+
+        if(content){
+            content.innerHTML =
+                storeApp();
+        }
+    }
+
+    /*
+     * Zavřít případné okno aplikace
+     */
+    if(windows[id]){
+        closeWindow(id);
+    }
+
+    notify(
+        app.name +
+        (fromTrash
+            ? " byla přesunuta do Koše a odinstalována."
+            : " byla odinstalována."
+        ),
+        "FoxOS",
+        "🗑️"
+    );
+}
+function toggleDesktopEdit(){
+ editing=!editing;
+ document.getElementById("desktop").classList.toggle("editing",editing);
+ renderDesktop();
+ notify(editing?"Režim úprav zapnut. Přetáhni nesystémovou aplikaci do Koše.":"Režim úprav vypnut.","Plocha","🖥️");
+}
+function enableIconDrag(el,app){
+ let dragging=false,dx=0,dy=0;
+ el.onpointerdown=e=>{
+  if(!editing || app.system || e.button!==0)return;
+  dragging=true;
+  dx=e.clientX-el.offsetLeft;
+  dy=e.clientY-el.offsetTop;
+  try{el.setPointerCapture(e.pointerId)}catch{}
+  function move(ev){
+   if(!dragging)return;
+   const x=Math.max(0,Math.min(innerWidth-105,ev.clientX-dx));
+   const y=Math.max(0,Math.min(innerHeight-155,ev.clientY-dy));
+   el.style.left=x+"px";
+   el.style.top=y+"px";
+   state.desktop[app.id]={x,y};
+   const tr=document.getElementById("trash"),r=tr.getBoundingClientRect();
+   tr.classList.toggle("dragOver",ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom);
+  }
+  function up(ev){
+   if(!dragging)return;
+   dragging=false;
+   document.removeEventListener("pointermove",move);
+   document.removeEventListener("pointerup",up);
+   const tr=document.getElementById("trash"),r=tr.getBoundingClientRect();
+   const over=ev.clientX>=r.left&&ev.clientX<=r.right&&ev.clientY>=r.top&&ev.clientY<=r.bottom;
+   tr.classList.remove("dragOver");
+  if(over){
+
+    uninstallApp(
+        app.id,
+        true
+    );
+
+    return;
+}
+
+save();
+renderDesktop();
+  }
+  document.addEventListener("pointermove",move);
+  document.addEventListener("pointerup",up);
+ };
+}
+function trashOver(e){if(!editing)return;e.preventDefault();document.getElementById("trash").classList.add("dragOver")}
+function trashLeave(){document.getElementById("trash").classList.remove("dragOver")}
+function trashDrop(e){e.preventDefault();trashLeave();const id=e.dataTransfer?.getData("text/appid");if(id)uninstallApp(id,true)}
+
+/* ===================== START MENU ===================== */
+function renderApps(){
+ const q=(document.getElementById("appSearch").value||"").toLowerCase();
+ const grid=document.getElementById("appGrid");
+ grid.innerHTML="";
+ apps.filter(a=>a.name.toLowerCase().includes(q)).forEach(a=>{
+  const b=document.createElement("button");
+  b.className="appItem";
+  b.innerHTML=`<div class="appIco">${appIconHtml(a,35)}</div><span>${esc(a.name)}</span>`;
+  b.onclick=()=>openApp(a.id);
+  grid.appendChild(b);
+ });
+}
+function toggleStart(){
+ const s=document.getElementById("startMenu");
+ s.style.display=s.style.display==="block"?"none":"block";
+ if(s.style.display==="block")renderApps();
+}
+
+/* ===================== WINDOWS ===================== */
+function createWindow(id,title,html,width=700,height=480){
+ if(windows[id]){
+  windows[id].style.display="flex";
+  bring(windows[id]);
+  return windows[id];
+ }
+ const w=document.createElement("div");
+ w.className="win";
+ w.id="win_"+id;
+ w.style.width=width+"px";
+ w.style.height=height+"px";
+ w.style.left=Math.max(8,(innerWidth-width)/2)+"px";
+ w.style.top=Math.max(8,(innerHeight-height-56)/2)+"px";
+ w.innerHTML=`<div class="titlebar"><strong>${title}</strong><div class="winBtns"><button onclick="minimize('${id}')">—</button><button onclick="maximize('${id}')">□</button><button class="close" onclick="closeWindow('${id}')">×</button></div></div><div class="content">${html}</div><div class="resizeHandle"></div>`;
+ document.getElementById("windows").appendChild(w);
+ windows[id]=w;
+ dragWindow(w);resizeWindow(w);bring(w);addTask(id,title);
+ return w;
+}
+function addTask(id,title){
+ const task=document.createElement("button");
+ task.className="task";
+ task.id="task_"+id;
+ task.title=title;
+ task.textContent="▣ "+title;
+ task.onclick=()=>{
+  const w=windows[id];
+  if(!w)return;
+  if(w.style.display==="none"){w.style.display="flex";bring(w)}
+  else{
+   const visible=w.style.display!=="none";
+   if(visible && w.style.zIndex==z)w.style.display="none";
+   else{w.style.display="flex";bring(w)}
+  }
+  updateTasks();
+ };
+ document.getElementById("tasks").appendChild(task);
+}
+function updateTasks(){
+ document.querySelectorAll("#tasks .task").forEach(t=>{
+  const id=t.id.replace("task_","");
+  const w=windows[id];
+  t.classList.toggle("active",!!w&&w.style.display!=="none");
+ });
+}
+function dragWindow(w){
+ const bar=w.querySelector(".titlebar");
+ let drag=false,ox=0,oy=0;
+ bar.onmousedown=e=>{
+  if(e.target.closest("button"))return;
+  drag=true;ox=e.clientX-w.offsetLeft;oy=e.clientY-w.offsetTop;bring(w);
+  const move=ev=>{
+   if(!drag)return;
+   w.style.left=Math.max(0,ev.clientX-ox)+"px";
+   w.style.top=Math.max(0,ev.clientY-oy)+"px";
+  };
+  const up=()=>{drag=false;document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up)};
+  document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);
+ };
+}
+function resizeWindow(w){
+ const handle=w.querySelector(".resizeHandle");
+ let resizing=false,sx=0,sy=0,sw=0,sh=0;
+ handle.onmousedown=e=>{
+  resizing=true;sx=e.clientX;sy=e.clientY;sw=w.offsetWidth;sh=w.offsetHeight;
+  const move=ev=>{
+   if(!resizing)return;
+   w.style.width=Math.max(300,sw+ev.clientX-sx)+"px";
+   w.style.height=Math.max(220,sh+ev.clientY-sy)+"px";
+  };
+  const up=()=>{resizing=false;document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up)};
+  document.addEventListener("mousemove",move);document.addEventListener("mouseup",up);
+ };
+}
+function bring(w){w.style.zIndex=++zIndex;updateTasks()}
+function minimize(id){
+ if(windows[id])windows[id].style.display="none";
+ updateTasks();
+}
+function maximize(id){
+ const w=windows[id];
+ if(!w)return;
+ if(w.dataset.max==="1"){
+  w.style.left=w.dataset.l;w.style.top=w.dataset.t;w.style.width=w.dataset.w;w.style.height=w.dataset.h;w.dataset.max="0";
+ }else{
+  w.dataset.l=w.style.left;w.dataset.t=w.style.top;w.dataset.w=w.style.width;w.dataset.h=w.style.height;
+  w.style.left="0";w.style.top="0";w.style.width="100%";w.style.height="calc(100% - 56px)";w.dataset.max="1";
+ }
+}
+function closeWindow(id){
+ if(windows[id])windows[id].remove();
+ delete windows[id];
+ document.getElementById("task_"+id)?.remove();
+ updateTasks();
+}
+
+/* ===================== OPEN APPS ===================== */
+function openApp(id){
+ document.getElementById("startMenu").style.display="none";
+ const a=getApp(id);
+ if(a?.type==="webapp"){openWebApp(a);return}
+ if(windows[id]){windows[id].style.display="flex";bring(windows[id]);return}
+
+ if(id==="help"){openHelp();return}
+
+ let title=a?.name||id,html="",w=700,h=480;
+ switch(id){
+  case"files":html=filesApp();w=900;h=650;break;
+  case"browser":html=browserApp();w=1000;h=700;break;
+  case"calendar":html=calendarApp();break;
+  case"clock":html=clockApp();break;
+  case"paint":html=paintApp();w=900;h=650;break;
+  case"vscode":html=vscodeApp();w=1050;h=720;break;
+  case"appstudio":html=appStudioApp();w=1000;h=720;break;
+  case"store":html=storeApp();w=900;h=680;break;
+  case"settings":html=settingsApp();w=900;h=720;break;
+  case"terminal":html=terminalApp();break;
+  case"calculator":html=calculatorApp();break;
+  case"notes":html=notesApp();break;
+  case"system":html=systemApp();break;
+  default:
+   html=customAppHTML(a);
+ }
+ const win=createWindow(id,esc(title),html,w,h);
+ setTimeout(()=>{
+  if(id==="files")renderFiles();
+  if(id==="calendar")drawCalendar();
+  if(id==="clock")updateClock();
+  if(id==="paint")setupPaint();
+  if(id==="browser")navigateBrowser();
+  if(id==="vscode")syncVSFiles();
+  if(id==="appstudio")refreshStudioApps();
+ },30);
+ return win;
+}
+function openWebApp(app){
+ const mode=state.settings.browserMode||"external";
+ if(mode==="internal"){
+  createWindow("web_"+app.id,appIconHtml(app,22)+" "+esc(app.name),`<div class="browserViewport"><iframe src="${escAttr(app.url)}" style="width:100%;height:100%;border:0;background:#fff"></iframe></div>`,1000,700);
+  return;
+ }
+ const popup=window.open(app.url,"FoxOS_"+app.id,"width=1050,height=760,resizable=yes,scrollbars=yes");
+ if(!popup)foxError("Prohlížeč zablokoval nové okno. Povol vyskakovací okna pro FoxOS.");
+}
+function openHelp(){
+ createWindow("help","❓ Fox://help",`
+  <h2>❓ Fox://help</h2>
+  <div class="card"><b>FoxBrowser</b><p>Výchozí režim je External WebApp. V Nastavení můžeš zapnout interní FoxOS iframe.</p></div>
+  <div class="card"><b>P</b><p>Zapne úpravu plochy a zobrazí Koš.</p></div>
+  <div class="card"><b>FoxStore</b><p>Umí instalovat, aktualizovat, odinstalovat a přidávat vlastní URL aplikace.</p></div>
+  <div class="card"><b>Soubory</b><p>Soubory a složky jsou uloženy ve FoxOS úložišti pro tento web.</p></div>
+ `,700,520);
+}
+
+/* ===================== FILES ===================== */
+function filesApp(){
+ return `<div class="sideLayout">
+  <div class="side">
+   <button class="active" onclick="setFileCat('all')">📦 Všechno</button>
+   <button onclick="setFileCat('images')">🖼️ Obrázky</button>
+   <button onclick="setFileCat('videos')">🎬 Videa</button>
+   <button onclick="setFileCat('docs')">📄 Dokumenty</button>
+   <button onclick="setFileCat('apps')">🧩 Aplikace</button>
+   <button onclick="setFileCat('other')">📦 Ostatní</button>
+   <hr>
+   <button onclick="newFolder()">📂 Nová složka</button>
+   <button onclick="uploadFile()">📥 Nahrát</button>
+  </div>
+  <div>
+   <div class="row"><button onclick="goParent()">⬆️ Nahoru</button><span id="folderPath" class="muted"></span></div>
+   <hr><div id="fileList"></div>
+   <input id="fileInput" type="file" multiple style="display:none" onchange="handleUpload(this)">
+  </div>
+ </div>`;
+}
+function setFileCat(c){
+ fileCategory=c;
+ document.querySelectorAll(".side button").forEach(b=>b.classList.remove("active"));
+ const buttons=document.querySelectorAll(".side button");
+ const map={all:0,images:1,videos:2,docs:3,apps:4,other:5};
+ if(buttons[map[c]])buttons[map[c]].classList.add("active");
+ renderFiles();
+}
+function currentFolder(){
+ return state.fs.folders.find(f=>f.id===currentFolderId)||state.fs.folders[0];
+}
+function renderFiles(){
+ if(!windows.files)return;
+ const list=windows.files.querySelector("#fileList");
+ const path=windows.files.querySelector("#folderPath");
+ const folder=currentFolder();
+ if(!folder)return;
+ path.textContent=folder.name;
+ const folders=state.fs.folders.filter(f=>f.parent===folder.id);
+ const files=state.fs.files.filter(f=>f.parent===folder.id).filter(fileMatchesCategory);
+ const folderHTML=folders.map(f=>`
+  <div class="folderRow">
+   <span style="font-size:28px">📂</span>
+   <b class="fileMeta">${esc(f.name)}</b>
+   <button onclick="enterFolder('${escAttr(f.id)}')">Otevřít</button>
+  </div>`).join("");
+ const fileHTML=files.map(fileRow).join("");
+ list.innerHTML=folderHTML+fileHTML||`<div class="card muted">Tato složka je prázdná.</div>`;
+}
+function fileMatchesCategory(f){
+ if(fileCategory==="all")return true;
+ if(fileCategory==="images")return /^image\//.test(f.type||"");
+ if(fileCategory==="videos")return /^video\//.test(f.type||"");
+ if(fileCategory==="docs")return /^text\//.test(f.type||"")||/\.(pdf|doc|docx)$/i.test(f.name);
+ if(fileCategory==="apps")return f.kind==="app";
+ return !/^image\//.test(f.type||"")&&!/^video\//.test(f.type||"")&&!/^text\//.test(f.type||"")&&!/\.(pdf|doc|docx)$/i.test(f.name)&&f.kind!=="app";
+}
+function fileRow(f){
+ const thumb=/^image\//.test(f.type||"")
+  ?`<img class="thumb" src="${escAttr(f.data)}" alt="">`
+  :`<div class="thumb">${fileIcon(f.name)}</div>`;
+ return `<div class="fileRow">
+  ${thumb}
+  <div class="fileMeta"><b>${esc(f.name)}</b><div class="muted small">${formatBytes(f.size)}</div></div>
+  <button onclick="openFile('${escAttr(f.id)}')">Otevřít</button>
+  <button onclick="downloadFS('${escAttr(f.id)}')">⬇️</button>
+  <button class="danger" onclick="deleteFS('${escAttr(f.id)}')">🗑️</button>
+ </div>`;
+}
+function fileIcon(name){
+ if(/\.(png|jpg|jpeg|gif|webp|svg)$/i.test(name))return"🖼️";
+ if(/\.(mp4|webm|mov)$/i.test(name))return"🎬";
+ if(/\.(html|css|js|py|json|md|txt)$/i.test(name))return"💻";
+ if(/\.(mp3|wav|ogg)$/i.test(name))return"🎵";
+ return"📄";
+}
+function formatBytes(n){
+ n=Number(n)||0;
+ if(n<1024)return n+" B";
+ if(n<1024*1024)return Math.round(n/1024)+" KB";
+ return (n/1024/1024).toFixed(1)+" MB";
+}
+function newFolder(){
+ const name=window.prompt("Název nové složky","Nová složka");
+ if(!name||!name.trim())return;
+ const folder={id:"folder_"+Date.now(),name:name.trim(),parent:currentFolderId};
+ state.fs.folders.push(folder);
+ save();renderFiles();
+ notify("Složka vytvořena.","Soubory","📂");
+}
+function enterFolder(id){currentFolderId=id;renderFiles()}
+function goParent(){
+ const f=currentFolder();
+ if(f&&f.parent)currentFolderId=f.parent;
+ renderFiles();
+}
+function uploadFile(){
+ if(windows.files)windows.files.querySelector("#fileInput").click();
+}
+function handleUpload(input){
+ [...input.files].forEach(file=>{
+  const r=new FileReader();
+  r.onload=()=>{
+   const item={id:"file_"+Date.now()+"_"+Math.random().toString(16).slice(2),name:file.name,size:file.size,type:file.type||"application/octet-stream",data:r.result,parent:currentFolderId,kind:"file"};
+   state.fs.files.push(item);
+   state.settings.cacheUsedMb=Math.min(state.settings.cacheLimitMb,state.settings.cacheUsedMb+(file.size/1024/1024));
+   save();renderFiles();
+   notify(file.name+" uložen do FoxOS.","Soubory","📥");
+  };
+  r.readAsDataURL(file);
+ });
+ input.value="";
+}
+function openFile(id){
+ const f=state.fs.files.find(x=>x.id===id);
+ if(!f)return;
+ if(/^image\//.test(f.type||"")){
+  createWindow("file_"+id,"🖼️ "+esc(f.name),`<img src="${escAttr(f.data)}" style="max-width:100%;max-height:100%;object-fit:contain">`,760,560);
+ }else if(/^text\//.test(f.type||"")||/\.(html|css|js|py|json|md|txt)$/i.test(f.name)){
+  let text="";
+  try{text=decodeURIComponent((f.data.split(",")[1]||""))}catch(e){}
+  createWindow("file_"+id,"📄 "+esc(f.name),`<pre style="white-space:pre-wrap">${esc(text)}</pre>`,800,600);
+ }else{
+  createWindow("file_"+id,"📄 "+esc(f.name),`<h2>${esc(f.name)}</h2><p>Soubor je uložen ve FoxOS.</p><button onclick="downloadFS('${escAttr(id)}')">⬇️ Stáhnout</button>`);
+ }
+}
+function downloadFS(id){
+ const f=state.fs.files.find(x=>x.id===id);
+ if(!f)return;
+ const a=document.createElement("a");a.href=f.data;a.download=f.name;a.click();
+}
+function deleteFS(id){
+ if(!confirmSafe("Smazat soubor?"))return;
+ state.fs.files=state.fs.files.filter(x=>x.id!==id);
+ save();renderFiles();
+}
+function confirmSafe(text){return window.confirm(text)}
+
+/* ===================== BROWSER ===================== */
+function browserApp(){
+ return `<div class="browserWrap">
+  <div class="browserTools">
+   <button onclick="foxBack()">←</button>
+   <button onclick="foxForward()">→</button>
+   <button onclick="navigateBrowser()">↻</button>
+   <input id="browserURL" value="${escAttr(state.settings.homepage)}" placeholder="Adresa nebo fox://help">
+   <button class="orange" onclick="navigateBrowser()">Přejít</button>
+  </div>
+  <div id="browserViewport" class="browserViewport">
+   <div class="card"><h2>🌐 FoxBrowser 9.0</h2><p>Zadej adresu nebo <b>fox://help</b>.</p></div>
+  </div>
+ </div>`;
+}
+function navigateBrowser(){
+ const w=windows.browser;
+ if(!w)return;
+ let u=w.querySelector("#browserURL").value.trim();
+ if(u.toLowerCase()==="fox://help"){openHelp();return}
+ u=normalizeUrl(u);
+ const area=w.querySelector("#browserViewport");
+ area.innerHTML=`<iframe src="${escAttr(u)}" referrerpolicy="strict-origin-when-cross-origin"></iframe><div style="position:absolute;left:10px;right:10px;bottom:10px;background:#0009;color:#fff;padding:8px;border-radius:8px;text-align:center;font-size:12px">Některé weby zakazují iframe. <button onclick="window.open('${escAttr(u)}','_blank')">Otevřít externě</button></div>`;
+}
+function foxBack(){notify("Historie je zatím simulována.","FoxBrowser","🌐")}
+function foxForward(){notify("Historie je zatím simulována.","FoxBrowser","🌐")}
+
+/* ===================== CALENDAR ===================== */
+function calendarApp(){
+ return `<div class="row"><button onclick="changeMonth(-1)">←</button><h2 id="calTitle" style="flex:1;text-align:center"></h2><button onclick="changeMonth(1)">→</button></div><div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div><div id="eventEditor"></div>`;
+}
+let calDate=new Date();
+function drawCalendar(){
+ const w=windows.calendar;if(!w)return;
+ const y=calDate.getFullYear(),m=calDate.getMonth();
+ const grid=w.querySelector("#calGrid");
+ w.querySelector("#calTitle").textContent=calDate.toLocaleDateString("cs-CZ",{month:"long",year:"numeric"});
+ grid.innerHTML="";
+ const offset=(new Date(y,m,1).getDay()+6)%7;
+ const days=new Date(y,m+1,0).getDate();
+ for(let i=0;i<offset;i++)grid.innerHTML+="<div></div>";
+ for(let d=1;d<=days;d++){
+  const key=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const now=new Date();
+  const today=d===now.getDate()&&m===now.getMonth()&&y===now.getFullYear();
+  grid.innerHTML+=`<div class="card" style="min-height:72px;cursor:pointer;outline:${today?"2px solid var(--accent)":"none"}" onclick="editEvent('${key}')"><b>${d}</b>${state.events[key]?`<div style="font-size:11px;color:var(--accent)">● ${esc(state.events[key].slice(0,18))}</div>`:""}</div>`;
+ }
+}
+function changeMonth(n){calDate.setMonth(calDate.getMonth()+n);drawCalendar()}
+function editEvent(key){
+ const w=windows.calendar;
+ w.querySelector("#eventEditor").innerHTML=`<div class="card"><b>📅 ${key}</b><input id="eventText" value="${escAttr(state.events[key]||"")}" style="width:100%;margin:8px 0" placeholder="Událost"><button class="orange" onclick="saveEvent('${key}')">Uložit</button> <button onclick="deleteEvent('${key}')">Smazat</button></div>`;
+}
+function saveEvent(key){
+ const v=windows.calendar.querySelector("#eventText").value.trim();
+ if(v)state.events[key]=v;else delete state.events[key];
+ save();drawCalendar();notify("Událost uložena.","Kalendář","📅");
+}
+function deleteEvent(key){delete state.events[key];save();drawCalendar()}
+
+/* ===================== CLOCK ===================== */
+function clockApp(){
+ return `<div class="card" style="text-align:center"><div id="bigClock" style="font-size:54px;font-weight:bold"></div><div id="bigDate" class="muted"></div></div>
+ <div class="card"><h3>⏱️ Stopky</h3><div id="stopwatch" style="font-size:34px">00:00.0</div><button class="orange" onclick="startStopwatch()">Start</button> <button onclick="stopStopwatch()">Stop</button> <button onclick="resetStopwatch()">Reset</button></div>
+ <div class="card"><h3>⌛ Časovač</h3><input id="timerMin" type="number" min="0" value="1" style="width:90px"> <button class="orange" onclick="startTimer()">Spustit</button> <button onclick="stopTimer()">Stop</button><div id="timerOut"></div></div>
+ <div class="card"><h3>🔔 Budík</h3><input id="alarmTime" type="time"> <button class="orange" onclick="setAlarm()">Nastavit</button> <button onclick="cancelAlarm()">Zrušit</button><div id="alarmOut"></div></div>`;
+}
+function updateClock(){
+ const now=new Date();
+ document.getElementById("taskClock").innerHTML=now.toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"})+"<br>"+now.toLocaleDateString("cs-CZ");
+ if(windows.clock){
+  windows.clock.querySelector("#bigClock").textContent=now.toLocaleTimeString("cs-CZ");
+  windows.clock.querySelector("#bigDate").textContent=now.toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+ }
+}
+function startStopwatch(){
+ if(stopwatchTimer)return;
+ stopwatchStart=Date.now()-stopwatchElapsed;
+ stopwatchTimer=setInterval(updateStopwatch,100);
+}
+function updateStopwatch(){
+ stopwatchElapsed=Date.now()-stopwatchStart;
+ if(!windows.clock)return;
+ const s=Math.floor(stopwatchElapsed/1000),ms=Math.floor(stopwatchElapsed/100)%10;
+ windows.clock.querySelector("#stopwatch").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")+"."+ms;
+}
+function stopStopwatch(){clearInterval(stopwatchTimer);stopwatchTimer=null}
+function resetStopwatch(){
+ stopStopwatch();
+ stopwatchElapsed=0;
+ if(windows.clock)windows.clock.querySelector("#stopwatch").textContent="00:00.0";
+}
+function startTimer(){
+ const w=windows.clock;if(!w)return;
+ let seconds=Math.max(1,Number(w.querySelector("#timerMin").value)*60);
+ clearInterval(timerInterval);
+ w.querySelector("#timerOut").textContent=formatTimer(seconds);
+ timerInterval=setInterval(()=>{
+  seconds--;
+  w.querySelector("#timerOut").textContent=formatTimer(seconds);
+  if(seconds<=0){
+   clearInterval(timerInterval);
+   timerInterval=null;
+   notify("Časovač skončil.","Fox Clock","🔔");
+  }
+ },1000);
+}
+function stopTimer(){clearInterval(timerInterval);timerInterval=null}
+function formatTimer(s){return Math.floor(s/60)+" min "+(s%60)+" s"}
+function setAlarm(){
+ const w=windows.clock;
+ if(!w)return;
+ const time=w.querySelector("#alarmTime").value;
+ if(!time){foxError("Vyber čas budíku.");return}
+ clearInterval(alarmTimer);
+ alarmTimer=setInterval(()=>{
+  const current=new Date().toTimeString().slice(0,5);
+  if(current===time){
+   notify("Budík!","Fox Clock","🔔");
+   clearInterval(alarmTimer);alarmTimer=null;
+  }
+ },1000);
+ w.querySelector("#alarmOut").textContent="Budík nastaven na "+time;
+}
+function cancelAlarm(){clearInterval(alarmTimer);alarmTimer=null;if(windows.clock)windows.clock.querySelector("#alarmOut").textContent="Budík vypnut."}
+
+/* ===================== PAINT ===================== */
+function paintApp(){
+ return `<div class="paintTools">
+  <input id="paintColor" type="color" value="#000000">
+  <label>Velikost <input id="paintSize" type="number" min="1" max="100" value="5" style="width:75px"></label>
+  <button onclick="paintMode='brush';notify('Štětec zapnut.','Malování','🖌️')">🖌️ Štětec</button>
+  <button onclick="paintMode='eraser';notify('Guma zapnuta.','Malování','🧽')">🧽 Guma</button>
+  <button onclick="paintMode='fill';notify('Výplň zapnuta.','Malování','🪣')">🪣 Výplň</button>
+  <button onclick="clearPaint()">🗑️ Vymazat</button>
+  <button class="orange" onclick="savePaint()">💾 Do Soubory</button>
+  <button onclick="downloadPaint()">⬇️ Do PC</button>
+ </div><br><canvas id="paintCanvas" width="1000" height="520"></canvas>`;
+}
+function setupPaint(){
+ const c=windows.paint.querySelector("#paintCanvas");
+ paintCtx=c.getContext("2d");
+ paintCtx.fillStyle="#fff";paintCtx.fillRect(0,0,c.width,c.height);
+ c.onpointerdown=e=>{
+  if(paintMode==="fill"){fillPaint(e,c);return}
+  painting=true;paintCtx.beginPath();paintCtx.moveTo(...paintPos(e,c));
+ };
+ c.onpointermove=e=>{
+  if(!painting)return;
+  const [x,y]=paintPos(e,c);
+  paintCtx.lineTo(x,y);
+  paintCtx.strokeStyle=paintMode==="eraser"?"#fff":windows.paint.querySelector("#paintColor").value;
+  paintCtx.lineWidth=Number(windows.paint.querySelector("#paintSize").value)||5;
+  paintCtx.lineCap="round";paintCtx.stroke();
+ };
+ c.onpointerup=()=>painting=false;
+ c.onpointerleave=()=>painting=false;
+}
+function paintPos(e,c){
+ const r=c.getBoundingClientRect();
+ return[(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height];
+}
+function fillPaint(e,c){
+ const [x,y]=paintPos(e,c);
+ paintCtx.fillStyle=windows.paint.querySelector("#paintColor").value;
+ paintCtx.fillRect(x-25,y-25,50,50);
+}
+function clearPaint(){if(paintCtx){paintCtx.fillStyle="#fff";paintCtx.fillRect(0,0,paintCtx.canvas.width,paintCtx.canvas.height)}}
+function downloadPaint(){
+ if(!paintCtx)return;
+ const a=document.createElement("a");a.href=paintCtx.canvas.toDataURL("image/png");a.download="TondaFox-malovani.png";a.click();
+}
+function savePaint(){
+ if(!paintCtx)return;
+ const data=paintCtx.canvas.toDataURL("image/png");
+ const size=Math.round(data.length*0.75);
+ state.fs.files.push({id:"file_"+Date.now(),name:"TondaFox-malovani.png",size,type:"image/png",data,parent:currentFolderId,kind:"file"});
+ state.settings.cacheUsedMb=Math.min(state.settings.cacheLimitMb,state.settings.cacheUsedMb+size/1024/1024);
+ save();renderFiles();
+ notify("Obrázek uložen do Soubory.","Malování","🎨");
+}
+
+/* ===================== VS CODE ===================== */
+function vscodeApp(){
+ return `<div class="row"><button class="orange" onclick="newVSFile()">＋ Nový soubor</button><button onclick="saveVS()">💾 Uložit</button><button onclick="runVS()">▶ Spustit</button></div>
+ <div class="sideLayout" style="margin-top:10px">
+  <div class="side"><div id="vsFileList"></div></div>
+  <div><input id="vsFileName" style="width:100%;margin-bottom:8px" placeholder="Název souboru"><textarea id="vsCode" class="editor"></textarea><iframe id="vsPreview" class="preview"></iframe></div>
+ </div>`;
+}
+function syncVSFiles(){
+ if(!windows.vscode)return;
+ const list=windows.vscode.querySelector("#vsFileList");
+ const files=state.fs.files.filter(f=>f.parent===currentFolderId&&/\.(html|css|js|py|json|txt|md)$/i.test(f.name));
+ if(!files.length){newVSFile();return}
+ list.innerHTML=files.map(f=>`<button style="width:100%;margin-bottom:5px;text-align:left" onclick="loadVSFile('${escAttr(f.id)}')">📄 ${esc(f.name)}</button>`).join("");
+ loadVSFile(files[0].id);
+}
+function newVSFile(){
+ if(!windows.vscode)return;
+ const n=window.prompt("Název souboru","projekt.html");
+ if(!n||!n.trim())return;
+ const name=n.trim();
+ state.fs.files.push({id:"file_"+Date.now(),name,type:guessType(name),size:0,data:"data:text/plain;charset=utf-8,",parent:currentFolderId,kind:"file"});
+ save();syncVSFiles();renderFiles();
+}
+function loadVSFile(id){
+ const f=state.fs.files.find(x=>x.id===id);
+ if(!f||!windows.vscode)return;
+ windows.vscode.querySelector("#vsFileName").value=f.name;
+ windows.vscode.querySelector("#vsCode").value=decodeData(f.data);
+ windows.vscode.querySelector("#vsCode").oninput=()=>saveVS(false);
+}
+function decodeData(data){
+ try{return decodeURIComponent((String(data).split(",")[1]||""))}catch(e){return""}
+}
+function guessType(name){
+ if(/\.html?$/i.test(name))return"text/html";
+ if(/\.css$/i.test(name))return"text/css";
+ if(/\.js$/i.test(name))return"application/javascript";
+ if(/\.json$/i.test(name))return"application/json";
+ if(/\.py$/i.test(name))return"text/x-python";
+ return"text/plain";
+}
+function saveVS(show=true){
+ if(!windows.vscode)return;
+ const name=windows.vscode.querySelector("#vsFileName").value.trim()||"projekt.html";
+ const code=windows.vscode.querySelector("#vsCode").value;
+ let f=state.fs.files.find(x=>x.name===name&&x.parent===currentFolderId);
+ if(!f){
+  f={id:"file_"+Date.now(),name,type:guessType(name),size:code.length,data:"",parent:currentFolderId,kind:"file"};
+  state.fs.files.push(f);
+ }
+ f.type=guessType(name);
+ f.data="data:"+f.type+";charset=utf-8,"+encodeURIComponent(code);
+ f.size=code.length;
+ save();
+ renderFiles();
+ if(show)notify("Soubor uložen do Soubory.","Fox VS Code","💾");
+}
+function runVS(){
+ saveVS(false);
+ if(!windows.vscode)return;
+ windows.vscode.querySelector("#vsPreview").srcdoc=windows.vscode.querySelector("#vsCode").value;
+}
+
+/* ===================== APP STUDIO ===================== */
+function appStudioApp(){return`<div class="card"><div class="row"><button class="orange" onclick="studioHome()">🏠 Domů</button><button onclick="studioCreate()">➕ Vytvořit aplikaci</button><button onclick="studioEditChoice()">✏️ Upravit aplikaci</button></div></div><div id="studioPanel"></div><div class="card"><h3>Moje aplikace</h3><div id="studioApps"></div></div>`}
+function refreshStudioApps(){if(!windows.appstudio)return;windows.appstudio.querySelector("#studioApps").innerHTML=state.customApps.map(a=>`<div class="review row"><div style="width:46px">${appIconHtml(a,40)}</div><div style="flex:1"><b>${esc(a.name)}</b><div class="muted small">${esc(a.version||"1.0")} • ${esc(a.language||"html")} • ${esc(a.fileName||a.name+".fna")}</div></div><button onclick="studioEdit('${escAttr(a.id)}')">Upravit</button><button class="danger" onclick="uninstallApp('${escAttr(a.id)}')">Odinstalovat</button></div>`).join("")||'<div class="muted">Zatím žádná vlastní aplikace.</div>';studioHome()}
+function studioHome(){if(!windows.appstudio)return;windows.appstudio.querySelector("#studioPanel").innerHTML=`<div class="card"><h2>🧩 FoxApp Studio</h2><p>Vyber činnost.</p><button class="orange" onclick="studioCreate()">➕ Vytvořit aplikaci</button> <button onclick="studioEditChoice()">✏️ Upravit aplikaci</button></div>`}
+function studioCreate(){windows.appstudio.querySelector("#studioPanel").innerHTML=`<div class="card"><h2>➕ Vytvořit aplikaci</h2><p>Název souboru nové aplikace:</p><input id="fnaBase" value="moje-aplikace" style="width:100%"><p class="muted">Přípona <b>.fna</b> je pevná a nelze změnit.</p><button class="orange" onclick="createFna()">Pokračovat</button></div>`}
+function createFna(){const w=windows.appstudio,base=w.querySelector("#fnaBase").value.trim().replace(/\.fna$/i,"").replace(/[^a-zA-Z0-9 _-]/g,"")||"moje-aplikace",fileName=base+".fna",id="custom_"+Date.now(),code="<!DOCTYPE html><html><body style='font-family:Arial;text-align:center;padding:30px'><h1>Moje Fox aplikace 🦊</h1></body></html>",app={id,name:base,fileName,ico:"🧩",iconData:"",type:"custom",language:"html",code,version:"1.0"};state.customApps.push(app);state.installed.push({...app});state.fs.files.push({id:"file_"+Date.now(),name:fileName,size:code.length,type:"application/fox-new-application",data:"data:text/plain;charset=utf-8,"+encodeURIComponent(code),parent:currentFolderId,kind:"app"});save();loadApps();renderDesktop();renderApps();renderFiles();refreshStudioApps();studioEdit(id);notify(fileName+" vytvořen.","FoxApp Studio","🧩")}
+function studioEditChoice(){const w=windows.appstudio;w.querySelector("#studioPanel").innerHTML=`<div class="card"><h2>✏️ Upravit aplikaci</h2><button class="orange" onclick="showOwnEditList()">🧩 Moje aplikace</button> <button onclick="showStoreEditList()">🛒 FoxStore aplikace</button></div>`}
+function showOwnEditList(){const w=windows.appstudio;w.querySelector("#studioPanel").innerHTML=`<div class="card"><h3>Moje aplikace</h3>${state.customApps.map(a=>`<div class="review row"><div style="width:45px">${appIconHtml(a,38)}</div><b style="flex:1">${esc(a.fileName||a.name+".fna")}</b><button onclick="studioEdit('${escAttr(a.id)}')">Upravit</button></div>`).join("")||'<p class="muted">Žádná vlastní aplikace.</p>'}</div>`}
+function showStoreEditList(){const list=state.installed.filter(a=>a.type==="webapp");const w=windows.appstudio;w.querySelector("#studioPanel").innerHTML=`<div class="card"><h3>Nainstalované FoxStore aplikace</h3>${list.map(a=>`<div class="review row"><div style="width:45px">${appIconHtml(a,38)}</div><b style="flex:1">${esc(a.name)}</b><button onclick="studioEdit('${escAttr(a.id)}',true)">Upravit kód</button></div>`).join("")||'<p class="muted">Žádná nainstalovaná webová aplikace.</p>'}</div>`}
+function studioEdit(id,storeMode=false){const a=state.customApps.find(x=>x.id===id)||state.installed.find(x=>x.id===id);if(!a)return;const w=windows.appstudio;w.dataset.editId=id;w.dataset.storeMode=storeMode?"1":"0";w.dataset.icon=a.iconData||"";w.querySelector("#studioPanel").innerHTML=`<div class="card"><div class="row"><button onclick="studioHome()">🏠 Domů</button>${!storeMode?`<button onclick="renameFna('${escAttr(id)}')">✏️ Přejmenovat soubor</button>`:""}</div><p><b>${esc(a.fileName||a.name+".fna")}</b></p><label>Jazyk: <select id="studioLang"><option value="html" ${a.language!=="python"?"selected":""}>HTML / CSS / JS</option><option value="python" ${a.language==="python"?"selected":""}>Python</option></select></label><br><br><button onclick="chooseStudioIcon()">🖼️ Vybrat ikonu z Fox Souborů</button> <span id="studioIconLabel" class="muted">${a.iconData?"✓ ikona nastavena":"Žádná ikona"}</span></div><textarea id="studioCode" class="editor">${esc(a.code||"")}</textarea><div class="row"><button class="orange" onclick="previewStudioEdit()">👁️ Náhled</button><button onclick="updateStudioApp()">🔄 Aktualizovat</button></div><iframe id="studioPreview" class="preview"></iframe>`}
+function renameFna(id){const a=state.customApps.find(x=>x.id===id);if(!a)return;const raw=window.prompt("Nový název .fna souboru",a.fileName||a.name+".fna");if(!raw)return;const base=raw.replace(/\.fna$/i,"").trim().replace(/[^a-zA-Z0-9 _-]/g,"");if(!base)return;const oldName=a.fileName;a.fileName=base+".fna";a.name=base;const f=state.fs.files.find(x=>x.kind==="app"&&x.name===oldName);if(f)f.name=a.fileName;save();loadApps();renderDesktop();renderApps();renderFiles();refreshStudioApps();notify("Soubor přejmenován.","FoxApp Studio","✏️")}
+function chooseStudioIcon(){openStudioIconPicker()}
+function openStudioIconPicker(){const imgs=state.fs.files.filter(f=>/^image\//.test(f.type||""));if(!imgs.length){foxError("Ve Fox Souborech není žádný obrázek.");return}const w=createWindow("iconPicker","🖼️ Vybrat ikonu",`<div id="iconPickerList"></div>`,650,520);w.querySelector("#iconPickerList").innerHTML=imgs.map(f=>`<button style="margin:5px" onclick="selectStudioIcon('${escAttr(f.id)}')"><img src="${escAttr(f.data)}" style="width:70px;height:70px;object-fit:contain"><br>${esc(f.name)}</button>`).join("")}
+function selectStudioIcon(fid){const f=state.fs.files.find(x=>x.id===fid),w=windows.appstudio;if(!f||!w)return;w.dataset.icon=f.data;const label=w.querySelector("#studioIconLabel");if(label)label.textContent=" ✓ "+f.name;closeWindow("iconPicker")}
+function previewStudioEdit(){const w=windows.appstudio,code=w.querySelector("#studioCode").value,lang=w.querySelector("#studioLang").value;w.querySelector("#studioPreview").srcdoc=lang==="python"?"<html><body style='font-family:Arial;padding:30px'><h2>🐍 Python</h2><p>Python projekt se ukládá do Fox Soubory; tento náhled Python nespouští.</p></body></html>":code}
+function updateStudioApp(){const w=windows.appstudio,id=w.dataset.editId,a=state.customApps.find(x=>x.id===id)||state.installed.find(x=>x.id===id);if(!a)return;const code=w.querySelector("#studioCode").value,lang=w.querySelector("#studioLang").value;a.code=code;a.language=lang;if(w.dataset.icon)a.iconData=w.dataset.icon;a.version=nextVersion(a.version||"1.0");if(state.customApps.some(x=>x.id===id)){const c=state.customApps.find(x=>x.id===id);c.code=code;c.language=lang;c.version=a.version;if(w.dataset.icon)c.iconData=w.dataset.icon}if(state.installed.some(x=>x.id===id)){const i=state.installed.find(x=>x.id===id);i.code=code;i.language=lang;i.version=a.version;if(w.dataset.icon)i.iconData=w.dataset.icon}const f=state.fs.files.find(x=>x.kind==="app"&&x.name===a.fileName);if(f){f.data="data:text/plain;charset=utf-8,"+encodeURIComponent(code);f.size=code.length}save();loadApps();renderDesktop();renderApps();renderFiles();refreshStudioApps();notify(a.name+" aktualizována na "+a.version+".","FoxApp Studio","✅")}
+
+/* ===================== STORE ===================== */
+function storeObj(id){
+ const s=storeSeed.find(x=>x[0]===id);
+ if(!s)return null;
+ return{id:s[0],name:s[1],url:s[2],description:s[3],ico:s[4],type:"webapp",version:s[5],rating:4.7,reviews:24};
+}
+function storeApp(){
+ const installed=new Set(state.installed.map(a=>a.id));
+ return `<h2>🛒 FoxStore</h2><p class="muted">Klikni na aplikaci pro detail.</p><div id="storeList">
+ ${storeSeed.map(a=>{
+  const ins=installed.has(a[0]);
+  return `<div class="card row storeCard" onclick="storeDetail('${a[0]}')">
+   <div class="storeIcon"><img src="${escAttr(a[4])}" alt="" onerror="this.style.display='none'"></div>
+   <div style="flex:1"><b>${esc(a[1])}</b><div class="muted">${esc(a[3])}</div><span class="badge">${ins?"Nainstalováno":"Dostupné"}</span></div>
+   <button class="orange" onclick="event.stopPropagation();${ins?`openWebApp(storeObj('${a[0]}'))`:`showInstallAnimation(storeObj('${a[0]}'))`}">${ins?"Otevřít":"Instalovat"}</button>
+  </div>`;
+ }).join("")}
+ </div>
+ <hr>
+ <button class="orange full" onclick="openStoreAdd()">＋ Přidat vlastní aplikaci</button>`;
+}
+function storeDetail(id){
+ const a=storeObj(id);if(!a)return;
+ const ins=state.installed.some(x=>x.id===id);
+ createWindow("storeDetail_"+id,"🛒 "+esc(a.name),`
+  <div class="row"><div class="storeDetailIcon"><img src="${escAttr(a.ico)}" style="max-width:72px;max-height:72px" onerror="this.style.display='none'"></div><div style="flex:1"><h2>${esc(a.name)}</h2><div class="stars">★★★★★</div><p class="muted">${esc(a.description)}</p></div></div>
+  <div class="card"><p>Verze <b>${esc(a.version)}</b></p>
+   ${ins
+    ?`<button class="orange" onclick="openWebApp(storeObj('${a.id}'))">Otevřít</button>
+      <button class="danger" onclick="uninstallApp('${a.id}');closeWindow('storeDetail_${a.id}')">Odinstalovat</button>
+`
+    :`<button class="orange" onclick="showInstallAnimation(storeObj('${a.id}'))">Instalovat</button>`}
+  </div>
+  <div class="card"><h3>Popis</h3><p>Webová aplikace FoxOS.</p></div>
+  <div class="card"><h3>Recenze</h3><div>⭐⭐⭐⭐⭐ Skvělé!</div><div>⭐⭐⭐⭐☆ Funguje dobře.</div></div>
+ `,760,620);
+}
+function showInstallAnimation(a,update=false){
+ if(!a)return;
+ if(state.installed.some(x=>x.id===a.id)&&!update){openWebApp(a);return}
+ clearInterval(pendingInstallTimer);
+ const overlay=document.getElementById("installOverlay");
+ document.getElementById("installIcon").innerHTML=appIconHtml(a,70);
+ document.getElementById("installName").textContent=a.name;
+ document.getElementById("installStatus").textContent=update?"Připravuji aktualizaci...":"Připravuji instalaci...";
+ document.getElementById("installPercent").textContent="0 %";
+ document.getElementById("installBar").style.width="0%";
+ overlay.style.display="flex";
+ let p=0;
+ pendingInstallTimer=setInterval(()=>{
+  p=Math.min(100,p+Math.floor(Math.random()*14)+6);
+  document.getElementById("installBar").style.width=p+"%";
+  document.getElementById("installPercent").textContent=p+" %";
+  document.getElementById("installStatus").textContent=p<35?"Připojování k FoxStore…":p<70?"Stahuji aplikaci…":p<94?"Instaluji…":"Dokončuji…";
+  if(p>=100){
+   clearInterval(pendingInstallTimer);
+   setTimeout(()=>{
+    if(update){
+     const x=state.installed.find(x=>x.id===a.id);if(x)x.version=nextVersion(x.version||"1.0");
+    }else if(!state.installed.some(x=>x.id===a.id)){
+     state.installed.push({...a});
+    }
+    save();loadApps();renderDesktop();renderApps();
+    overlay.style.display="none";
+    notify(update?a.name+" aktualizována.":a.name+" nainstalována.","FoxStore","✅");
+   },350);
+  }
+ },140);
+}
+function nextVersion(v){
+ const n=String(v).split(".").map(Number);
+ if(n.length<2)return"1.1";
+ n[1]=(Number(n[1])||0)+1;
+ return n[0]+"."+n[1];
+}
+function openStoreAdd(){
+ createWindow("storeAdd","＋ FoxStore — Přidat aplikaci",`
+  <div class="card"><h3>Typ</h3>
+   <button class="orange" onclick="addOwnToStore()">🧩 Vlastní aplikace z FoxApp Studio</button>
+   <button onclick="addUrlToStore()">🌐 Aplikace z URL</button>
+  </div>`,600,420);
+}
+function addOwnToStore(){
+ if(!state.customApps.length){foxError("Nejdříve vytvoř aplikaci ve FoxApp Studio.");return}
+ createWindow("storeOwnPick","🧩 Vyber aplikaci",`<div>${state.customApps.map(a=>`<div class="card row"><div style="width:55px">${appIconHtml(a,42)}</div><b style="flex:1">${esc(a.name)}</b><button onclick="publishOwnToStore('${escAttr(a.id)}')">Přidat</button></div>`).join("")}</div>`,650,520);
+}
+function publishOwnToStore(id){
+ const a=state.customApps.find(x=>x.id===id);
+ if(!a)return;
+ if(!state.installed.some(x=>x.id===a.id))state.installed.push({...a});
+ save();loadApps();renderDesktop();renderApps();
+ closeWindow("storeOwnPick");closeWindow("storeAdd");
+ notify(a.name+" je dostupná ve FoxStore.","FoxStore","🧩");
+}
+function addUrlToStore(){
+ const raw=window.prompt("URL webové aplikace","https://example.com");
+ if(!raw)return;
+ let url;
+ try{url=new URL(normalizeUrl(raw)).href}catch(e){foxError("Neplatná URL.");return}
+ const id="url_"+Date.now();
+ const name=new URL(url).hostname;
+ const app={id,name,url,ico:url.replace(/\/$/,"")+"/favicon.ico",type:"webapp",version:"1.0",description:"Vlastní aplikace z URL",rating:0,reviews:0};
+ state.installed.push(app);
+ save();loadApps();renderDesktop();renderApps();
+ closeWindow("storeAdd");
+ notify(name+" přidána do FoxOS.","FoxStore","➕");
+}
+
+/* ===================== SETTINGS ===================== */
+function settingsApp(){
+ return `<h2>⚙️ Nastavení FoxOS ${CURRENT_VERSION}</h2><div class="settingsGrid"><div><button class="full" onclick="settingsSection('account')">👤 Účet</button><button class="full" onclick="settingsSection('appearance')">🎨 Vzhled</button><button class="full" onclick="settingsSection('apps')">📦 Aplikace</button><button class="full" onclick="settingsSection('browser')">🌐 FoxBrowser</button><button class="full" onclick="settingsSection('storage')">💾 Úložiště</button><button class="full" onclick="settingsSection('update')">🔄 Update</button><button class="full" onclick="settingsSection('hardware')">🧠 Hardware</button><button class="full" onclick="settingsSection('system')">ℹ️ Systém</button></div><div id="settingsBody"></div></div>`;
+}
+function settingsSection(section){
+ const w=windows.settings;if(!w)return;
+ const b=w.querySelector("#settingsBody"),s=state.settings;
+ if(section==="account")b.innerHTML=`<div class="card"><h3>👤 Účet</h3><p>Uživatel: <b>${esc(state.user)}</b></p><button onclick="logout()">🔒 Odhlásit se</button></div>`;
+ else if(section==="appearance")b.innerHTML=`<div class="card"><h3>🎨 Hlavní plocha</h3><button onclick="setTheme('dark')">🌙 Tmavý</button> <button onclick="setTheme('light')">☀️ Světlý</button><hr><label><input type="checkbox" ${s.wallpaperFox?"checked":""} onchange="toggleWallpaperFox(this.checked)"> průhledná profilovka</label><p>Vlastní pozadí: <input type="file" accept="image/*" onchange="setWallpaperFile(this)"></p><button onclick="clearWallpaper()">↩️ Výchozí pozadí</button></div><div class="card"><h3>🔐 Přihlašovací obrazovka</h3><p>Výchozí pozadí je modré Windows 11.</p><input type="file" accept="image/*" onchange="setLockWallpaperFile(this)"><br><br><button onclick="clearLockWallpaper()">↩️ Obnovit výchozí</button></div>`;
+ else if(section==="apps")b.innerHTML=`<div class="card"><h3>📦 Aplikace</h3><p>Aktualizace aplikací z FoxStore jsou automatické.</p><p>Nainstalováno: <b>${state.installed.length}</b></p><button onclick="openApp('store')">🛒 FoxStore</button> <button onclick="openApp('appstudio')">🧩 FoxApp Studio</button></div>`;
+ else if(section==="browser")b.innerHTML=`<div class="card"><h3>🌐 FoxBrowser</h3><select onchange="state.settings.browserMode=this.value;save();notify('Režim FoxBrowser změněn.','FoxBrowser','🌐')"><option value="external" ${s.browserMode==='external'?'selected':''}>External WebApp (výchozí)</option><option value="internal" ${s.browserMode==='internal'?'selected':''}>FoxOS okno / iframe</option></select><p><input id="homeSetting" style="width:100%" value="${escAttr(s.homepage)}"></p><button onclick="saveBrowserSettings()">Uložit domovskou stránku</button></div>`;
+ else if(section==="storage"){const pct=Math.min(100,(s.cacheUsedMb/Math.max(1,s.cacheLimitMb))*100);b.innerHTML=`<div class="card"><h3>💾 Úložiště / Cache</h3><p>Využito: <b>${s.cacheUsedMb.toFixed(2)} MB</b> / ${s.cacheLimitMb} MB</p><div class="progress"><i style="width:${pct}%"></i></div><p><input id="cacheLimit" type="number" min="50" max="51200" step="50" value="${s.cacheLimitMb}"> MB</p><button onclick="saveCacheLimit()">Nastavit limit</button> <button onclick="clearFoxCache()">🧹 Vymazat cache</button><p class="muted small">Zvýšení limitu samo o sobě disk nezaplní.</p></div>`;}
+ else if(section==="update"){
+  const available=getAvailableUpdates();
+  b.innerHTML=`<div class="card"><h3>🔄 FoxOS Update</h3><p>Aktuální verze: <b>${esc(state.version||CURRENT_VERSION)}</b></p>${available.length?available.map(u=>`<div class="card"><b>🟠 Dostupná aktualizace ${esc(u.version)}</b><p>${esc(u.description||'Nová verze FoxOS')}</p><p>Velikost: ${formatBytes((u.code||'').length)}</p><button class="orange" onclick="installAdminUpdate('${escAttr(u.version)}')">⬇️ Aktualizovat na ${escAttr(u.version)}</button></div>`).join(''):`<p>✅ Žádná nová aktualizace není dostupná.</p>`}<hr><p>Tuto funkci použij, pokud se po aktualizaci nezachovaly všechny soubory.</p><button class="orange" onclick="restoreSavedFiles()">♻️ Obnovit uložené soubory</button><p class="muted small">Aktualizace vydává správce webu. Uživatel pouze vidí dostupné aktualizace.</p></div>`;
+ }
+ else if(section==="hardware")b.innerHTML=`<div class="card"><h3>🧠 Hardware</h3><p>Simulovaný hardware FoxOS.</p><button class="orange" onclick="openHardware()">Otevřít Hardware</button></div>`;
+ else b.innerHTML=`<div class="card"><h3>ℹ️ Systém</h3><p>FoxOS ${esc(state.version||CURRENT_VERSION)} — TondaFox Edition</p><p>Aplikace: ${apps.length}</p><p>Soubory: ${state.fs.files.length}</p></div><div class="card"><button class="danger" onclick="factoryReset()">⚠️ Tovární nastavení</button></div>`;
+}
+function setTheme(t){state.theme=t;state.settings.theme=t;save();document.body.classList.toggle("light",t==="light");notify(t==="light"?"Světlý režim zapnut.":"Tmavý režim zapnut.","Vzhled",t==="light"?"☀️":"🌙")}
+function toggleWallpaperFox(v){state.settings.wallpaperFox=!!v;save();applySettings()}
+function setWallpaperFile(inp){
+ const f=inp.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{state.settings.wallpaper=r.result;state.settings.cacheUsedMb=Math.min(state.settings.cacheLimitMb,state.settings.cacheUsedMb+f.size/1024/1024);save();applySettings();notify("Pozadí bylo změněno.","Vzhled","🖼️")};
+ r.readAsDataURL(f);
+}
+function clearWallpaper(){state.settings.wallpaper="";save();applySettings();notify("Výchozí pozadí obnoveno.","Vzhled","🖼️")}
+function setLockWallpaperFile(inp){
+ const f=inp.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{state.settings.lockWallpaper=r.result;state.settings.cacheUsedMb=Math.min(state.settings.cacheLimitMb,state.settings.cacheUsedMb+f.size/1024/1024);save();updateLock();notify("Pozadí přihlášení změněno.","Vzhled","🔐")};
+ r.readAsDataURL(f);
+}
+function clearLockWallpaper(){state.settings.lockWallpaper=LOCK_BG_DEFAULT;save();updateLock();notify("Výchozí pozadí přihlášení obnoveno.","Vzhled","🔐")}
+function saveBrowserSettings(){
+ const w=windows.settings;const v=w.querySelector("#homeSetting").value.trim();
+ state.settings.homepage=normalizeUrl(v);save();notify("Domovská stránka uložena.","FoxBrowser","🌐");
+}
+function saveCacheLimit(){
+ const w=windows.settings;let value=Number(w.querySelector("#cacheLimit").value);
+ if(!Number.isFinite(value))value=500;
+ value=Math.max(50,Math.min(51200,value));
+ state.settings.cacheLimitMb=value;
+ if(state.settings.cacheUsedMb>value){
+  foxError("Nový limit je menší než aktuálně využitá cache.");
+  return;
+ }
+ save();notify("Limit úložiště nastaven na "+value+" MB.","Úložiště","💾");
+}
+function clearFoxCache(){
+ if(!confirmSafe("Vymazat cache FoxOS? Smažou se uložené soubory, pozadí a vlastní aplikace."))return;
+ state.fs={files:[],folders:[{id:"root",name:"Domů",parent:null}]};
+ state.customApps=[];state.installed=[];
+ state.settings.wallpaper="";state.settings.cacheUsedMb=0;
+ save();loadApps();renderDesktop();renderApps();
+ notify("Cache byla vymazána.","Úložiště","🧹");
+}
+function restoreSavedFiles(){
+ let restored=0;
+ for(const oldKey of OLD_KEYS){
+  const old=safeParse(localStorage.getItem(oldKey));
+  if(!old)continue;
+  if(old.files && Array.isArray(old.files))old.files.forEach(f=>{
+   if(!state.fs.files.some(x=>x.name===f.name&&x.size===f.size)){
+    state.fs.files.push({...f,id:"restored_"+Date.now()+"_"+Math.random()});
+    restored++;
+   }
+  });
+  if(old.customApps && Array.isArray(old.customApps))old.customApps.forEach(a=>{
+   if(!state.customApps.some(x=>x.id===a.id)){
+    state.customApps.push(a);state.installed.push({...a});restored++;
+   }
+  });
+ }
+ save();loadApps();renderDesktop();renderApps();
+ notify(restored?("Obnoveno položek: "+restored):"Nic dalšího nebylo nalezeno.","FoxOS Update","♻️");
+}
+function logout(){
+ Object.keys({...windows}).forEach(closeWindow);
+ document.getElementById("desktop").style.display="none";
+ document.getElementById("login").style.display="flex";
+ document.getElementById("loginUser").textContent="Uživatel: "+state.user;
+ document.getElementById("loginPass").value="";
+}
+function factoryReset(){
+ if(!confirmSafe("Tovární nastavení smaže účet, aplikace, soubory, pozadí a cache FoxOS. Pokračovat?"))return;
+ localStorage.removeItem(KEY);
+ for(const k of OLD_KEYS)localStorage.removeItem(k);
+ location.reload();
+}
+
+/* ===================== HARDWARE / SAFE UPDATE ===================== */
+function getAvailableUpdates(){
+ const installed=versionNumber(state.version||CURRENT_VERSION);
+ return ADMIN_UPDATES.filter(u=>versionNumber(u.version)>installed).sort((a,b)=>versionNumber(a.version)-versionNumber(b.version));
+}
+function openHardware(){
+ createWindow("hardware","🧠 FoxOS Hardware",`<div class="card"><h3>⚠️ VAROVÁNÍ</h3><p>Tato část upravuje pouze simulovaný FoxOS. Uživatel zde nemůže vydat vlastní aktualizaci.</p></div><div class="card"><h3>💻 Kód FoxOS</h3><p class="muted">Správce přidává aktualizace do konstanty <b>ADMIN_UPDATES</b> přímo ve zdrojovém HTML.</p><button onclick="openCodeEditor()">✏️ Otevřít HTML editor</button></div>`,800,560);
+}
+function installAdminUpdate(version){
+ const u=ADMIN_UPDATES.find(x=>x.version===version);
+ if(!u)return;
+ if(versionNumber(u.version)<=versionNumber(state.version||CURRENT_VERSION)){foxError("Tato aktualizace už není novější než tvoje verze.");return}
+ const size=(u.code||"").length;
+ const o=document.getElementById("installOverlay");
+ document.getElementById("installIcon").innerHTML="🔄";
+ document.getElementById("installName").textContent="FoxOS "+u.version;
+ document.getElementById("installStatus").textContent="Stahuji aktualizaci…";
+ document.getElementById("installPercent").textContent="0 %";
+ document.getElementById("installBar").style.width="0%";
+ o.style.display="flex";
+ let p=0;clearInterval(pendingInstallTimer);
+ pendingInstallTimer=setInterval(()=>{
+  p=Math.min(100,p+10+Math.floor(Math.random()*10));
+  document.getElementById("installBar").style.width=p+"%";
+  document.getElementById("installPercent").textContent=p+" %";
+  document.getElementById("installStatus").textContent=p<35?"Stahuji update…":p<70?"Kontroluji soubory…":p<95?"Instaluji změny…":"Dokončuji…";
+  if(p>=100){
+   clearInterval(pendingInstallTimer);
+   setTimeout(()=>{
+    try{
+     applyAdminPatch(u.code||"");
+     state.version=u.version;
+     state.update={installedVersion:u.version,pending:null};
+     state.settings.cacheUsedMb=Math.min(state.settings.cacheLimitMb,state.settings.cacheUsedMb+size/1024/1024);
+     save();
+     o.style.display="none";
+     notify("FoxOS byl aktualizován na "+u.version+".","FoxOS Update","✅");
+     setTimeout(()=>location.reload(),900);
+    }catch(e){o.style.display="none";triggerCrash("Instalace aktualizace selhala: "+e.message)}
+   },400);
+  }
+ },130);
+}
+function applyAdminPatch(code){
+ if(!code.trim())return;
+ if(code.startsWith("FOX_UPDATE:NON_SYSTEM_APPS|")){
+  const ids=code.split("|")[1].split(",").map(x=>x.trim()).filter(Boolean);
+  state.systemApps={};
+  defaultApps.forEach(app=>{state.systemApps[app.id]=SYSTEM_IDS.has(app.id)?true:!ids.includes(app.id)});
+  return;
+ }
+ if(code.startsWith("FOX_UPDATE:ADD_NOTE|")){state.notes+=(state.notes?"\n":"")+code.split("|").slice(1).join("|");return}
+ if(code.startsWith("FOX_UPDATE:THEME|")){const t=code.split("|")[1];if(t!=="dark"&&t!=="light")throw new Error("Neplatné téma");state.theme=t;state.settings.theme=t;return}
+ if(code.startsWith("FOX_UPDATE:SET_BROWSER_MODE|")){const mode=code.split("|")[1];if(mode!=="external"&&mode!=="internal")throw new Error("Neplatný režim FoxBrowser");state.settings.browserMode=mode;return}
+ throw new Error("Neznámý aktualizační patch");
+}
+function versionNumber(v){const p=String(v||"0.0").split(".").map(x=>Number(x)||0);return(p[0]||0)*100+(p[1]||0)}
+function openCodeEditor(){
+ createWindow("hardwareCode","💻 FoxOS — Editor celého kódu",`<h2>💻 Celý HTML kód</h2><p class="muted">Zde můžeš zobrazit a otestovat zdrojový dokument. Webová stránka sama nemůže bezpečně přepsat lokální HTML soubor.</p><textarea id="fullFoxCode" style="width:100%;height:390px;font:12px Consolas,monospace"></textarea><br><button onclick="loadCurrentSource()">📥 Načíst aktuální kód</button><button class="orange" onclick="testFullCode()">🧪 Otestovat</button><iframe id="fullCodePreview" class="preview"></iframe>`,1000,700);loadCurrentSource();
+}
+function loadCurrentSource(){const w=windows.hardwareCode;if(w)w.querySelector("#fullFoxCode").value=document.documentElement.outerHTML}
+function testFullCode(){const w=windows.hardwareCode;if(!w)return;const code=w.querySelector("#fullFoxCode").value;if(!code.includes("<html")||!code.includes("</html>")){triggerCrash("Zdrojový kód není kompletní HTML dokument.");return}w.querySelector("#fullCodePreview").srcdoc=code;notify("Kód byl vložen do bezpečného náhledu.","Hardware","✅")}
+
+function calculatorApp(){
+ return `<h2>🧮 Kalkulačka</h2><input id="calc" style="width:100%;font-size:25px"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px">${["7","8","9","/","4","5","6","*","1","2","3","-","0",".","=","+"].map(x=>`<button onclick="calcPress('${x}')">${x}</button>`).join("")}</div><button class="danger" style="width:100%;margin-top:7px" onclick="calcClear()">C</button>`;
+}
+function calcPress(x){
+ const i=windows.calculator.querySelector("#calc");
+ if(x==="="){
+  try{i.value=Function("return "+i.value.replace(/[^0-9+\-*/().]/g,""))()}catch(e){i.value="Chyba"}
+ }else i.value+=x;
+}
+function calcClear(){windows.calculator.querySelector("#calc").value=""}
+function notesApp(){return `<h2>📝 Poznámky</h2><textarea id="notes" style="width:100%;height:360px" oninput="state.notes=this.value;save()">${esc(state.notes||"")}</textarea>`}
+function systemApp(){return `<h2>🖥️ Tento počítač</h2><div class="card"><b>🦊 FoxOS 9.3</b><p>Uživatel: ${esc(state.user)}</p><p>Aplikace: ${apps.length}</p><p>Soubory: ${state.fs.files.length}</p><p>Cache: ${state.settings.cacheUsedMb.toFixed(2)} MB / ${state.settings.cacheLimitMb} MB</p></div>`}
+
+/* ===================== SETTINGS HELPERS ===================== */
+function applySettings(){
+ document.body.classList.toggle("light",state.theme==="light");
+ const d=document.getElementById("desktop"),wall=document.getElementById("wallFox");
+ if(state.settings.wallpaper){d.style.backgroundImage=`url("${state.settings.wallpaper}")`;d.style.backgroundSize="cover";d.style.backgroundPosition="center";d.style.backgroundRepeat="no-repeat"}
+ else{d.style.backgroundImage="radial-gradient(circle at 20% 20%,#ff7a0016,transparent 30%),radial-gradient(circle at 80% 80%,#735cff13,transparent 35%)";d.style.backgroundColor="var(--bg)";d.style.backgroundSize="auto"}
+ wall.style.display=state.settings.wallpaperFox===false?"none":"flex";
+ updateLock();
+}
+
+/* ===================== FACTORY / KEYBOARD ===================== */
+document.addEventListener("keydown",e=>{
+ const lock=document.getElementById("lock");
+ if(lock && lock.style.display==="flex"){
+  lock.style.display="none";
+  document.getElementById("login").style.display="flex";
+  document.getElementById("loginUser").textContent="Uživatel: "+(state?.user||"TondaFox");
+  document.getElementById("loginPass").focus();
+  return;
+ }
+ if(e.key.toLowerCase()==="p"&&!["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)){
+  toggleDesktopEdit();
+ }
+ if(e.key==="Escape")document.getElementById("startMenu").style.display="none";
+});
+
+/* ===================== START ===================== */
+setTimeout(()=>{
+ document.getElementById("boot").style.display="none";
+ initialize();
+},2100);
+</script>
+</body>
+</html>
