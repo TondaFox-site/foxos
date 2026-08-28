@@ -1,7 +1,7 @@
 {
   "name": "foxos-proxy",
   "version": "1.0.0",
-  "description": "Proxy server pro FoxOS",
+  "description": "Proxy pro FoxOS",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
